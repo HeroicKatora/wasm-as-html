@@ -187,15 +187,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "478c572c3d73181ff3c2539045f6eb99e5491218eae919370993b890cdbdd98e"
 
 [[package]]
-name = "polyglot"
-version = "0.0.0"
-dependencies = [
- "clap",
- "wasm-encoder",
- "wasmparser",
-]
-
-[[package]]
 name = "proc-macro-error"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -329,6 +320,15 @@ name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
+
+[[package]]
+name = "wasm-as-html"
+version = "0.0.0"
+dependencies = [
+ "clap",
+ "wasm-encoder",
+ "wasmparser",
+]
 
 [[package]]
 name = "wasm-encoder"
