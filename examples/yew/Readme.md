@@ -16,3 +16,5 @@ wasm-as-html --index-html todomvc/index.html \
   < target/generated/todomvc_bg.wasm \
   > todomvc.html
 ```
+
+Live [as TodoMVC](https://heroickatora.github.io/wasm-as-html/examples/yew/todomvc.html) (Please enable JS).
