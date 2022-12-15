@@ -1,0 +1,31 @@
+--> <div id="mainpage">
+	<div id="stage0_error"></div>
+<script>
+  /* Loader, stage 0: ensure that browser skips the rest of the document,
+  reload our full document into the memory as a binary blob and jump to
+  stage1 execution. The size of this document is extremely important!
+   */
+
+  /* Secret sauce to stop further HTML interpreter */
+  document.documentElement.innerHTML = document.getElementById('mainpage').innerHTML;
+
+  /* Async prepare handoff */
+  (async function() {
+    /* Error handling, in case we need it */
+    let error = document.getElementById('stage0_error');
+    try {
+      let doc = await fetch(window.location.href);
+      let bytes = await doc.arrayBuffer();
+      let wasm = new WebAssembly.Module(bytes);
+
+      let stage1 = WebAssembly.Module.customSections(wasm, 'polyglot_stage1')[0];
+      let blob = new Blob([stage1], { type: 'application/javascript' });
+      let blobURL = URL.createObjectURL(blob);
+      let module = (await import(blobURL));
+      await module.default(bytes, wasm);
+    } catch (e) {
+      error.innerText = ''+e;
+    }
+  })();
+</script>
+<!--

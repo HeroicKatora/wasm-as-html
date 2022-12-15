@@ -1,0 +1,11 @@
+[package]
+name = "polyglot"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+wasm-encoder = "0.20"
+wasmparser = "0.95"
+[dependencies.clap]
+version = "4"
+features = ["derive"]
