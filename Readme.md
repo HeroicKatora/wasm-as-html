@@ -10,7 +10,9 @@ app if you want to explore its command line options.
 wasm-as-html --index-html /my/index.html /my/todomvc.js < /my/todomvc_bg.wasm > todomvc.html
 ```
 
-See <examples/yew/Readme.md> for a specific description.
+See [examples/yew/Readme.md] for a specific description.
+
+Or [TodoMVC deployed on gh-pages](https://heroickatora.github.io/wasm-as-html/examples/yew/todomvc.html).
 
 ## How it works
 
