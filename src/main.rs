@@ -55,6 +55,15 @@ fn main() -> Result<(), std::io::Error> {
         }
     }
 
+    if let Some(zip_file) = &args.zip {
+        let zip_data = std::fs::read(zip_file)?;
+
+        encoder.section(&wasm_encoder::CustomSection {
+            name: "wah_polyglot_stage1_data",
+            data: &zip_data,
+        });
+    }
+
     let wasm = encoder.finish();
 
     match &args.out {
@@ -90,4 +99,7 @@ struct Args {
     stage_2: PathBuf,
     /// The web assembly module to embed ourselves in, default stdin.
     wasm: Option<PathBuf>,
+    /// A zip file to attach.
+    #[arg(short, long)]
+    zip: Option<PathBuf>,
 }
