@@ -3,6 +3,8 @@ async function init(bytes, wasm) {
 
   if (index_html.length) {
     document.documentElement.innerHTML = (new TextDecoder().decode(index_html[0]));
+  } else {
+    document.getElementById('stage0_error').innerText = '';
   }
 
   let stage2 = WebAssembly.Module.customSections(wasm, 'wah_polyglot_stage2');

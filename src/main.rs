@@ -57,9 +57,13 @@ fn main() -> Result<(), std::io::Error> {
 
     if let Some(zip_file) = &args.zip {
         let zip_data = std::fs::read(zip_file)?;
+        let name = args
+            .zip_section_name
+            .as_deref()
+            .unwrap_or("wah_polyglot_stage2_data");
 
         encoder.section(&wasm_encoder::CustomSection {
-            name: "wah_polyglot_stage1_data",
+            name,
             data: &zip_data,
         });
     }
@@ -85,21 +89,41 @@ fn parse_err(_: wasmparser::BinaryReaderError) -> std::io::Error {
 
 #[derive(Parser)]
 struct Args {
-    #[arg(short, long)]
-    out: Option<PathBuf>,
-    #[arg(short, long)]
-    index_html: Option<PathBuf>,
-    /// The stage 2 loader payload.
+    // Positional arguments
+
+    /// The stage 2 loader payload, a JS module.
     ///
     /// Stage 0 refers to the necessary inline script block to take control of HTML processing,
-    /// stage 1 to the built-in jump pad implemented as a separate Javascript custom section. The
-    /// stage 2 payload is a module that gains control of execution and is invoked with a fake
-    /// request that resolves to full WASM module, after the page has been replaced with the
-    /// indicated `index.html`.
+    /// stage 1 to the built-in jump pad implemented as a separate Javascript custom section.
+    ///
+    /// The stage 2 payload is your module that gains control of execution and is invoked with a
+    /// fake request that resolves to full WASM module, after the page has been replaced with the
+    /// indicated `index.html`. The stage 1 will call its default export as 
+    ///
+    /// stage2_module.default(Promise.resolve(new Response(wasmblob)))
+    #[arg(name = "STAGE2_JS")]
     stage_2: PathBuf,
     /// The web assembly module to embed ourselves in, default stdin.
     wasm: Option<PathBuf>,
-    /// A zip file to attach.
+
+    // Options.
+
+    /// A file to write the module to, default stdout.
     #[arg(short, long)]
+    out: Option<PathBuf>,
+    /// An HTML page to use when invoking the loader. Setup by the stage 1 loader. Defaults to an
+    /// empty page that hides some garbage from processing the WASM module header.
+    #[arg(short, long)]
+    index_html: Option<PathBuf>,
+    /// A zip file to attach.
+    ///
+    /// This file is added as a final section of the module (so its central archive is within the
+    /// last 512 bytes).
+    #[arg(short, long = "trailing-zip", alias = "zip")]
     zip: Option<PathBuf>,
+    /// A customized section name to use for the final zip section.
+    /// 
+    /// The section is named `wah_polyglot_stage2_data` by default.
+    #[arg(long = "trailing-zip-section")]
+    zip_section_name: Option<String>,
 }
