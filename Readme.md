@@ -1,4 +1,18 @@
-A packer that turns a WASM file into a webpage that can execute it!
+A packer that adds a webpage to WASM module, making it self-hosted!
+
+## Motivation
+
+At the moment, Browsers can not executed WebAssembly as a native single page
+app. Hopefully, this will change at some point. This 'packer' allows you to
+preserve the WebAssembly interpretation, unchanged, while adding an HTML loader
+as a form of polyfill for the native loader environment.
+
+That said you could also regard it as a more general tool for WebAssembly
+plugins, as a form of hypervisor. Provide a stage2 loader that emulates the
+host environment within an HTML page. This could be, for instance, a WASI
+environment with a file system in local storage. Such an app can be ran
+natively or deployed to a browser as a 'hardware-agnostic' alternative, from a
+single binary file.
 
 ## How to use it
 

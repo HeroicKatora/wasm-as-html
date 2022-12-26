@@ -18,13 +18,14 @@
       let bytes = await doc.arrayBuffer();
       let wasm = new WebAssembly.Module(bytes);
 
-      let stage1 = WebAssembly.Module.customSections(wasm, 'polyglot_stage1')[0];
+      let stage1 = WebAssembly.Module.customSections(wasm, 'wah_polyglot_stage1')[0];
       let blob = new Blob([stage1], { type: 'application/javascript' });
       let blobURL = URL.createObjectURL(blob);
       let module = (await import(blobURL));
       await module.default(bytes, wasm);
     } catch (e) {
-      error.innerText = ''+e;
+      console.log(e);
+      error.innerText = 'Failed to load: '+e;
     }
   })();
 </script>
