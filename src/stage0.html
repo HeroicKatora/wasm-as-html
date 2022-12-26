@@ -1,12 +1,14 @@
---> <div id="mainpage">
-	<div id="stage0_error"></div>
+-->
+<html><head><link rel="stylesheet" type="text/css" href="data:text/css,body{visibility:hidden}" /></head><body>
+<div id="mainpage" style="visibility:initial">
+	<div id="stage0_error">You need Javascript to load this page</div>
 <script>
   /* Loader, stage 0: ensure that browser skips the rest of the document,
   reload our full document into the memory as a binary blob and jump to
   stage1 execution. The size of this document is extremely important!
    */
 
-  /* Secret sauce to stop further HTML interpreter */
+  /* Stop further HTML interpreter after the script tag */
   document.documentElement.innerHTML = document.getElementById('mainpage').innerHTML;
 
   /* Async prepare handoff */
