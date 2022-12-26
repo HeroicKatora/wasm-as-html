@@ -2,7 +2,7 @@ A packer that adds a webpage to WASM module, making it self-hosted!
 
 ## Motivation
 
-At the moment, Browsers can not executed WebAssembly as a native single page
+At the moment, Browsers can not execute WebAssembly as a native single page
 app. Hopefully, this will change at some point. This 'packer' allows you to
 preserve the WebAssembly interpretation, unchanged, while adding an HTML loader
 as a form of polyfill for the native loader environment.
@@ -27,6 +27,12 @@ wasm-as-html --index-html /my/index.html /my/todomvc.js < /my/todomvc_bg.wasm > 
 See [examples/yew/Readme.md] for a specific description.
 
 Or [TodoMVC deployed on gh-pages](https://heroickatora.github.io/wasm-as-html/examples/yew/todomvc.html).
+
+## Experimental
+
+There's an experimental `--edit` flag. This replaces stage1 with an auto-reload
+driver, which will periodically refetch the document to compare hashes. It will
+the invoke the entrypoint with the new bytes, again. 
 
 ## How it works
 

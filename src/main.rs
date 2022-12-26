@@ -29,7 +29,12 @@ fn main() -> Result<(), std::io::Error> {
     // The actual (document) loader that prepares inputs and control for stage 2.
     encoder.section(&wasm_encoder::CustomSection {
         name: "wah_polyglot_stage1",
-        data: include_bytes!("stage1.js"),
+        data: if args.edit {
+            assert!(std::env::var_os("WAH_POLYGLOT_EXPERIMENTAL").is_some());
+            include_bytes!("stage1-edit.js")
+        } else {
+            include_bytes!("stage1.js")
+        },
     });
 
     if let Some(index) = &args.index_html {
@@ -90,7 +95,6 @@ fn parse_err(_: wasmparser::BinaryReaderError) -> std::io::Error {
 #[derive(Parser)]
 struct Args {
     // Positional arguments
-
     /// The stage 2 loader payload, a JS module.
     ///
     /// Stage 0 refers to the necessary inline script block to take control of HTML processing,
@@ -98,7 +102,7 @@ struct Args {
     ///
     /// The stage 2 payload is your module that gains control of execution and is invoked with a
     /// fake request that resolves to full WASM module, after the page has been replaced with the
-    /// indicated `index.html`. The stage 1 will call its default export as 
+    /// indicated `index.html`. The stage 1 will call its default export as
     ///
     /// stage2_module.default(Promise.resolve(new Response(wasmblob)))
     #[arg(name = "STAGE2_JS")]
@@ -107,7 +111,6 @@ struct Args {
     wasm: Option<PathBuf>,
 
     // Options.
-
     /// A file to write the module to, default stdout.
     #[arg(short, long)]
     out: Option<PathBuf>,
@@ -122,8 +125,19 @@ struct Args {
     #[arg(short, long = "trailing-zip", alias = "zip")]
     zip: Option<PathBuf>,
     /// A customized section name to use for the final zip section.
-    /// 
+    ///
     /// The section is named `wah_polyglot_stage2_data` by default.
     #[arg(long = "trailing-zip-section")]
     zip_section_name: Option<String>,
+
+    // Experimental section.
+    /// Experimental. Hot-reload when the WASM file changes.
+    ///
+    /// Details and use-case are not entirely fixed. Should we 'reboot' into the new stage0,
+    /// stage1, or stage2? At the moment it calls the _old_ stage2 with the _new_ WASM data. This
+    /// works with Yew Apps, for example.
+    ///
+    /// Must set the environment variable `WAH_POLYGLOT_EXPERIMENTAL` to use.
+    #[arg(long, alias = "dev")]
+    edit: bool,
 }
