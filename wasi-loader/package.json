@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@bjorn3/browser_wasi_shim": "git+https://github.com/HeroicKatora/browser_wasi_shim"
+    "@bjorn3/browser_wasi_shim": "0.2.2"
   },
   "devDependencies": {
     "esbuild": "0.17.4"
