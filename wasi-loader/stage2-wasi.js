@@ -1,8 +1,16 @@
 import { WASI, File, PreopenDirectory } from "@bjorn3/browser_wasi_shim";
+import { instructions, unzip } from 'wasi-config:'
 
 async function mount(promise) {
-  let args = ["hq9+", "-f", "test.hq9+"];
-  let env = ["FOO=bar"];
+  let wasm = await WebAssembly.compileStreaming(await promise);
+
+  var configuration = {
+    args: ["bin"],
+    env: [],
+    fds: {},
+    dir: {},
+    load_data: [],
+  };
 
   var stdin = new File([]);
   var stdout = new File([]);
@@ -15,16 +23,86 @@ async function mount(promise) {
       "test.hq9+": new File(new TextEncoder("utf-8").encode(`HHHH+Q`)),
     });
 
-  let fds = [
+  configuration.fds = [
     dir.path_open(0, "stdin", 0).fd_obj,
     dir.path_open(0, "stdout", 0).fd_obj,
     dir.path_open(0, "stderr", 0).fd_obj,
     dir,
   ];
 
+  let wah_wasi_config_data = WebAssembly.Module.customSections(wasm, 'wah_wasi_config');
+  wah_wasi_config_data.unshift(new TextEncoder('utf-8').encode('{}'));
+
+  if (wah_wasi_config_data.length > 0) {
+    /* Optional: we could pre-execute this on the config data, thus yielding
+     * the `output` instructions.
+     **/
+    let output = await instructions(wah_wasi_config_data[0]);
+
+    let inst = new Uint32Array(output.buffer);
+    var iptr = 0;
+
+    // The configuration output is 'script' in a simple, static assignment
+    // scripting language. We have objects and each instruction calls one of
+    // them with some arguments.
+    const ops = [
+      /* 0: the configuration object */
+      configuration,
+      /* 1: skip */ 
+      (cnt) => iptr += cnt,
+      /* 2: string */
+      (ptr, len) => new TextDecoder('utf-8').decode(output.subarray(ptr, ptr+len)),
+      /* 3: json */
+      (ptr, len) => JSON.parse(output.subarray(ptr, ptr+len)),
+      /* 4: integer const */
+      (c) => c,
+      /* 5: array */
+      (ptr, len) => output.subarray(ptr, ptr+len),
+      /* 6: get */
+      (from, idx) => from[ops[idx]],
+      /* 7: set */
+      (into, idx, what) => from[ops[idx]],
+      /* 8: File */
+      (what) => new File(ops[what]),
+      /* 9: Directory */
+      (what) => new Directory(ops[what]),
+      /* 10: PreopenDirectory */
+      (where, what) => new PreopenDirectory(ops[where], ops[what]),
+      /* 11: Directory.open */
+      (dir, im_flags, path, im_oflags) => {
+        return ops[dir].path_open(im_flags, ops[path], im_oflags).fd_obj;
+      },
+      /* 12: unzip */
+      (what) => unzip(ops[what]),
+    ];
+
+    document.documentElement.textContent = '\n';
+
+    try {
+      while (iptr < inst.length) {
+        let fn_ = ops[inst.at(iptr)];
+        let acnt = inst.at(iptr+1);
+        let args = inst.subarray(iptr+2, iptr+2+acnt);
+
+        ops.push(fn_.apply(null, args));
+        iptr += 2 + acnt;
+      }
+    } catch (e) {
+      document.documentElement.textContent += '\n'+ops;
+      document.documentElement.textContent += '\n'+e;
+    }
+
+    document.documentElement.textContent += JSON.stringify(ops, (_, v) => typeof v === 'bigint' ? v.toString() : v);
+  }
+
+  // document.documentElement.textContent = JSON.stringify(configuration);
+
+  let args = configuration.args;
+  let env = configuration.env;
+  let fds = configuration.fds;
+
   let wasi = new WASI(args, env, fds);
 
-  let wasm = await WebAssembly.compileStreaming(await promise);
   let inst = await WebAssembly.instantiate(wasm, {
     "wasi_snapshot_preview1": wasi.wasiImport,
   });  
@@ -33,7 +111,6 @@ async function mount(promise) {
     wasi.start(inst);
   } finally {
     let decoder = new TextDecoder();
-    console.log(stdin, stdout, stderr);
     console.log(decoder.decode(stdin.data));
     console.log(decoder.decode(stdout.data));
     console.log(decoder.decode(stderr.data));

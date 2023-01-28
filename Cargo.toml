@@ -9,3 +9,10 @@ wasmparser = "0.95"
 [dependencies.clap]
 version = "4"
 features = ["derive"]
+
+[workspace]
+members = [".", "wasi-loader"]
+
+[profile.release]
+opt-level = 's'
+strip = true

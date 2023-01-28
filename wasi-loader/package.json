@@ -2,7 +2,13 @@
   "dependencies": {
     "@bjorn3/browser_wasi_shim": "0.2.2"
   },
+  "optionalDependencies": {
+    "zip": "1.2.0"
+  },
   "devDependencies": {
     "esbuild": "0.17.4"
+  },
+  "scripts": {
+    "build": "node ./build.js"
   }
 }
