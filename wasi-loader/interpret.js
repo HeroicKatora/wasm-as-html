@@ -1,4 +1,5 @@
-import wasm_config_module from 'cargo-wasm32:./Cargo.toml';
+import wasm_config_module from 'cargo-wasm32:wasi_loader';
+import zip from 'cargo-wasm32:unzip';
 
 async function loadInterpretedData(loader_data) {
   let shared = {};
@@ -19,5 +20,13 @@ async function loadInterpretedData(loader_data) {
 
   return new Uint32Array(output.buffer);
 }
+
+let instructions = loadInterpretedData;
+let unzip = undefined;
+
+export {
+  instructions,
+  unzip,
+};
 
 export default loadInterpretedData;

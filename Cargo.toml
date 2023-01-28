@@ -11,7 +11,11 @@ version = "4"
 features = ["derive"]
 
 [workspace]
-members = [".", "wasi-loader"]
+members = [
+  ".",
+  "wasi-loader/interpret",
+  "wasi-loader/unzip",
+]
 
 [profile.release]
 opt-level = 's'

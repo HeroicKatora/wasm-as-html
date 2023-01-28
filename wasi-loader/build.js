@@ -7,16 +7,18 @@ let cratePlugin = {
   name: 'wasm32-crate',
   setup(build) {
     // Use a reference to `Cargo.toml` to denote the target
-    build.onResolve({ filter: /^cargo-wasm32:.*Cargo.toml$/ }, args => ({
+    build.onResolve({ filter: /^cargo-wasm32:.*$/ }, args => ({
       path: args.path,
       namespace: 'cargo-crate-ns',
     }))
 
     // Invokes the cargo build and copies the output to a binary include.
     // FIXME: this is hard coded against the `wasi_loader` crate.
-    build.onLoad({ filter: /.*/, namespace: 'cargo-crate-ns' }, async () => {
-      execFile('cargo', ['build', '--release', '--target', 'wasm32-unknown-unknown']);
-      let contents = await fs.promises.readFile('../target/wasm32-unknown-unknown/release/wasi_loader.wasm');
+    build.onLoad({ filter: /.*/, namespace: 'cargo-crate-ns' }, async args => {
+      let crate = args.path.replace(/cargo-wasm32:/, '');
+      execFile('cargo', ['build', '--release', '--target', 'wasm32-unknown-unknown', '-p', crate]);
+
+      let contents = await fs.promises.readFile(`../target/wasm32-unknown-unknown/release/${crate}.wasm`);
       let bytes = new Uint8Array(contents.buffer);
 
       return {
@@ -43,9 +45,14 @@ let wasiInterpreterPlugin = {
 
     // FIXME: we want to setup an es module with 'dynamic' requirements, based
     // on the instructions that are being used in the DSL program.
-    build.onLoad({ filter: /.*/, namespace: 'wasi-interpreter-ns' }, async () => {
+    build.onLoad({ filter: /.*/, namespace: 'wasi-interpreter-ns' }, async args => {
+      // Restore the true path of configuration.
+      let cfgpath = args.path.replace(/[.]mjs$/, '').replace(/^wasi-config:/, '');
+      let contents = await fs.promises.readFile(cfgpath);
+
       return {
         contents: await fs.promises.readFile('interpret.js'),
+        resolveDir: 'node_modules',
         loader: 'js',
       };
     })
@@ -57,5 +64,5 @@ await esbuild.build({
   bundle: true,
   outfile: 'out.js',
   format: 'esm',
-  plugins: [cratePlugin],
+  plugins: [cratePlugin, wasiInterpreterPlugin],
 })

@@ -1,5 +1,6 @@
 import { WASI, File, PreopenDirectory } from "@bjorn3/browser_wasi_shim";
-import { instructions, unzip } from 'wasi-config:'
+// This include is synthesized by `build.js:wasiInterpreterPlugin`.
+import { instructions, unzip } from 'wasi-config:config.toml'
 
 async function mount(promise) {
   let wasm = await WebAssembly.compileStreaming(await promise);
