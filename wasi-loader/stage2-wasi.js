@@ -9,8 +9,6 @@ async function mount(promise) {
     args: ["bin", "-f", "hello.hq9+"],
     env: [],
     fds: {},
-    dir: {},
-    load_data: [],
   };
 
   var stdin = new File([]);
@@ -104,6 +102,7 @@ async function mount(promise) {
   let args = configuration.args;
   let env = configuration.env;
   let fds = configuration.fds;
+  let filesystem = configuration.fds[3];
 
   let wasi = new WASI(args, env, fds);
 
@@ -118,6 +117,15 @@ async function mount(promise) {
     console.log(decoder.decode(stdin.data));
     console.log(decoder.decode(stdout.data));
     console.log(decoder.decode(stderr.data));
+  }
+
+  if (filesystem !== undefined && (true || configuration.html)) {
+    let module = filesystem.path_open(0, "index.js", 0).fd_obj;
+    let blob = new Blob([module.file.data.buffer], { type: 'application/javascript' });
+    let blobURL = URL.createObjectURL(blob);
+
+    let stage3_module = (await import(blobURL));
+    stage3_module.default({ stdin, stdout, stderr, filesystem });
   }
 }
 
