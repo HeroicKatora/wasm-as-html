@@ -3,7 +3,11 @@ name = "unzip"
 version = "0.1.0"
 edition = "2021"
 
-[lib]
-crate-type = ["cdylib"]
+[[bin]]
+name = "unzip"
+# crate-type = ["cdylib"]
 
-[dependencies]
+[dependencies.zip]
+version = "0.6.3"
+default-features = false
+features = ["deflate"]

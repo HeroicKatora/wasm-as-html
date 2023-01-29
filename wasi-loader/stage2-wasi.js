@@ -39,6 +39,9 @@ async function mount(promise) {
      * the `output` instructions.
      **/
     let output = await instructions(wah_wasi_config_data[0]);
+    let data = new Uint8Array(output.buffer);
+    console.log('OUTPUT!!', output);
+    console.log('DATA!!', data);
 
     let inst = new Uint32Array(output.buffer);
     var iptr = 0;
@@ -52,7 +55,7 @@ async function mount(promise) {
       /* 1: skip */ 
       (cnt) => iptr += cnt,
       /* 2: string */
-      (ptr, len) => new TextDecoder('utf-8').decode(output.subarray(ptr, ptr+len)),
+      (ptr, len) => new TextDecoder('utf-8').decode(data.subarray(ptr, ptr+len)),
       /* 3: json */
       (ptr, len) => JSON.parse(output.subarray(ptr, ptr+len)),
       /* 4: integer const */
@@ -73,8 +76,10 @@ async function mount(promise) {
       (dir, im_flags, path, im_oflags) => {
         return ops[dir].path_open(im_flags, ops[path], im_oflags).fd_obj;
       },
-      /* 12: unzip */
+      /* 12: unzip: (binary) => PreopenDirectory */
       (what) => unzip(ops[what]),
+      /* 13: section */
+      (what) => WebAssembly.Module.customSections(wasm, ops[what])
     ];
 
     document.documentElement.textContent = '\n';
@@ -89,8 +94,8 @@ async function mount(promise) {
         iptr += 2 + acnt;
       }
     } catch (e) {
-      document.documentElement.textContent += '\n'+ops;
-      document.documentElement.textContent += '\n'+e;
+      document.documentElement.textContent += '\nOps: '+ops;
+      document.documentElement.textContent += '\nError: '+e;
     }
 
     document.documentElement.textContent += JSON.stringify(ops, (_, v) => typeof v === 'bigint' ? v.toString() : v);

@@ -9,22 +9,46 @@ let cratePlugin = {
     // Use a reference to `Cargo.toml` to denote the target
     build.onResolve({ filter: /^cargo-wasm32:.*$/ }, args => ({
       path: args.path,
-      namespace: 'cargo-crate-ns',
-    }))
+      namespace: 'cargo-crate-wasm32-ns',
+    }));
 
-    // Invokes the cargo build and copies the output to a binary include.
-    // FIXME: this is hard coded against the `wasi_loader` crate.
-    build.onLoad({ filter: /.*/, namespace: 'cargo-crate-ns' }, async args => {
-      let crate = args.path.replace(/cargo-wasm32:/, '');
-      execFile('cargo', ['build', '--release', '--target', 'wasm32-unknown-unknown', '-p', crate]);
+    build.onResolve({ filter: /^cargo-wasi:.*$/ }, args => ({
+      path: args.path,
+      namespace: 'cargo-crate-wasi-ns',
+    }));
+    
 
-      let contents = await fs.promises.readFile(`../target/wasm32-unknown-unknown/release/${crate}.wasm`);
+    async function cargo_artifact(args, target) {
+      let crate = args.path.replace(/cargo-wa(sm32|si):/, '');
+      let exec = await new Promise((resolve, reject) => {
+        execFile(
+          'cargo',
+          ['build', '--release', '--target', target, '-p', crate],
+          (error, stdout, stderr) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve(error);
+            }
+          })
+        });
+
+      let contents = await fs.promises.readFile(`../target/${target}/release/${crate}.wasm`);
       let bytes = new Uint8Array(contents.buffer);
 
       return {
         contents: bytes,
         loader: 'binary',
       };
+    }
+
+    // Invokes the cargo build and copies the output to a binary include.
+    build.onLoad({ filter: /.*/, namespace: 'cargo-crate-wasm32-ns' }, async args => {
+      return await cargo_artifact(args, 'wasm32-unknown-unknown');
+    })
+
+    build.onLoad({ filter: /.*/, namespace: 'cargo-crate-wasi-ns' }, async args => {
+      return await cargo_artifact(args, 'wasm32-wasi');
     })
   },
 }
@@ -51,7 +75,7 @@ let wasiInterpreterPlugin = {
       let contents = await fs.promises.readFile(cfgpath);
 
       return {
-        contents: await fs.promises.readFile('interpret.js'),
+        contents: await fs.promises.readFile('interpret/interpret.js'),
         resolveDir: 'node_modules',
         loader: 'js',
       };
