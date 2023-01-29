@@ -1,9 +1,4 @@
-#[link(wasm_import_module = "wah_wasi")]
-extern "C" {
-    fn length() -> usize;
-    fn get(ptr: usize);
-    fn put(ptr: usize, len: usize);
-}
+use std::io::{Read, Write};
 
 const INST_SKIP: u32 = 1;
 const INST_STRING: u32 = 2;
@@ -21,12 +16,9 @@ const ENV_DIR: &[u8] = b"dir";
 const ENV_FDS: &[u8] = b"fds";
 const ENV_DIR_ROOT: &[u8] = b".";
 
-#[no_mangle]
-pub fn configure() {
-    let len = unsafe { length() };
-
-    let mut buffer = vec![0; len];
-    unsafe { get(buffer.as_mut_ptr() as usize) };
+pub fn main() -> Result<(), std::io::Error> {
+    let mut buffer = vec![];
+    std::io::stdin().read_to_end(&mut buffer)?;
 
     // Here, parse the configuration and setup WASI.
     let mut instructions = vec![0u8; 0];
@@ -75,5 +67,6 @@ pub fn configure() {
         instructions.extend_from_slice(&[0; 4][..pad]);
     }
 
-    unsafe { put(instructions.as_ptr() as usize, instructions.len()) };
+    std::io::stdout().write_all(&instructions)?;
+    Ok(())
 }

@@ -3,8 +3,8 @@ name = "wasi_loader"
 version = "0.1.0"
 edition = "2021"
 
-[lib]
-crate-type = ["cdylib"]
+[[bin]]
+name = "wasi_loader"
 
 [dependencies.bytemuck]
 version = "1.11"

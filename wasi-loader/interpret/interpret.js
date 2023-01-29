@@ -1,29 +1,37 @@
 import { WASI, File, PreopenDirectory } from "@bjorn3/browser_wasi_shim";
-import wasm_config_module from 'cargo-wasm32:wasi_loader';
+import wasm_config_module from 'cargo-wasi:wasi_loader';
 import wasm_zip_module from 'cargo-wasi:unzip';
 
 async function loadInterpretedData(loader_data) {
-  let shared = {};
-  let output = new Uint8Array();
+  let loader_module = WebAssembly.compile(wasm_config_module);
 
-  let loader_module = await WebAssembly.compile(wasm_config_module);
-
-  let loader = await WebAssembly.instantiate(loader_module, {
-    wah_wasi: {
-      length: () => loader_data.length,
-      get: (ptr) => new Uint8Array(shared.memory.buffer).set(loader_data, ptr),
-      put: (ptr, len) => output = new Uint8Array(shared.memory.buffer).slice(ptr, ptr+len),
-    },
+  let stdin = new File(loader_data);
+  let stdout = new File([]);
+  let stderr = new File([]);
+  let stddir = new PreopenDirectory(".", {
+      "stdin": stdin,
+      "stdout": stdout,
+      "stderr": stderr,
   });
 
-  shared.memory = loader.exports.memory;
-  loader.exports.configure();
+  let fds = [
+    stddir.path_open(0, "stdin", 0).fd_obj,
+    stddir.path_open(0, "stdout", 0).fd_obj,
+    stddir.path_open(0, "stderr", 0).fd_obj,
+    stddir,
+  ];
 
-  return new Uint32Array(output.buffer);
+  let wasi = new WASI(["wasi-loader-interpreter"], [], fds);
+  let inst = await WebAssembly.instantiate(await loader_module, {
+    "wasi_snapshot_preview1": wasi.wasiImport,
+  });
+
+  wasi.start(inst);
+  return new Uint32Array(stdout.data.buffer);
 }
 
 async function unzip(bin_data, configuration) {
-  let unzip_module = await WebAssembly.compile(wasm_zip_module);
+  let unzip_module = WebAssembly.compile(wasm_zip_module);
 
   let stdout = new File([]);
   let stderr = new File([]);
@@ -42,11 +50,11 @@ async function unzip(bin_data, configuration) {
     outdir,
   ];
 
-  let args = ["unzip"];
+  let args = ["wasi-loader-unzip"];
   let env = [];
 
   let wasi = new WASI(args, env, fds);
-  let inst = await WebAssembly.instantiate(unzip_module, {
+  let inst = await WebAssembly.instantiate(await unzip_module, {
     "wasi_snapshot_preview1": wasi.wasiImport,
   });  
 
