@@ -50,12 +50,7 @@ async function unzip(bin_data, configuration) {
     "wasi_snapshot_preview1": wasi.wasiImport,
   });  
 
-  try {
-    wasi.start(inst);
-  } finally {
-    console.log('UNZIP', outdir, stddir, wasi);
-    console.log('ERROR', new TextDecoder('utf-8').decode(stderr.data));
-  }
+  wasi.start(inst);
 
   return outdir;
 }

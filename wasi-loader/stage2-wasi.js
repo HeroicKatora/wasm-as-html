@@ -63,9 +63,9 @@ async function mount(promise) {
       /* 5: array */
       (ptr, len) => output.subarray(ptr, ptr+len),
       /* 6: get */
-      (from, idx) => from[ops[idx]],
+      (from, idx) => ops[from][ops[idx]],
       /* 7: set */
-      (into, idx, what) => from[ops[idx]],
+      (into, idx, what) => (ops[into])[ops[idx]] = ops[what],
       /* 8: File */
       (what) => new File(ops[what]),
       /* 9: Directory */
@@ -77,7 +77,7 @@ async function mount(promise) {
         return ops[dir].path_open(im_flags, ops[path], im_oflags).fd_obj;
       },
       /* 12: unzip: (binary) => PreopenDirectory */
-      (what) => unzip(ops[what]),
+      async (what) => await unzip(ops[what]),
       /* 13: section */
       (what) => WebAssembly.Module.customSections(wasm, ops[what])
     ];
@@ -90,7 +90,7 @@ async function mount(promise) {
         let acnt = inst.at(iptr+1);
         let args = inst.subarray(iptr+2, iptr+2+acnt);
 
-        ops.push(fn_.apply(null, args));
+        ops.push(await fn_.apply(null, args));
         iptr += 2 + acnt;
       }
     } catch (e) {
