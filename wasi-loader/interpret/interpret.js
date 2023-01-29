@@ -51,8 +51,7 @@ async function unzip(bin_data, configuration) {
   });  
 
   wasi.start(inst);
-
-  return outdir;
+  return outdir.dir.contents;
 }
 
 let instructions = loadInterpretedData;

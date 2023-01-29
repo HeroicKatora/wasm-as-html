@@ -6,7 +6,7 @@ async function mount(promise) {
   let wasm = await WebAssembly.compileStreaming(await promise);
 
   var configuration = {
-    args: ["bin"],
+    args: ["bin", "-f", "hello.hq9+"],
     env: [],
     fds: {},
     dir: {},
@@ -40,8 +40,6 @@ async function mount(promise) {
      **/
     let output = await instructions(wah_wasi_config_data[0]);
     let data = new Uint8Array(output.buffer);
-    console.log('OUTPUT!!', output);
-    console.log('DATA!!', data);
 
     let inst = new Uint32Array(output.buffer);
     var iptr = 0;
@@ -63,7 +61,7 @@ async function mount(promise) {
       /* 5: array */
       (ptr, len) => output.subarray(ptr, ptr+len),
       /* 6: get */
-      (from, idx) => ops[from][ops[idx]],
+      (from, idx) => (ops[from])[ops[idx]],
       /* 7: set */
       (into, idx, what) => (ops[into])[ops[idx]] = ops[what],
       /* 8: File */
