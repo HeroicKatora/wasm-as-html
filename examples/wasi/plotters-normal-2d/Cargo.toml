@@ -1,0 +1,14 @@
+[package]
+name = "plotters-normal-2d"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies.plotters]
+version = "0.3.4"
+default-features = false
+features = ["svg_backend", "all_elements", "all_series"]
+
+[dependencies]
+rand = "0.8.3"
+rand_distr = "0.4.0"
+rand_xorshift = "0.3.0"
