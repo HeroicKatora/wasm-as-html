@@ -1,3 +1,12 @@
+//! This interpreter converts a declarative wah/WASI configuration into a linear instruction
+//! sequence to be interpreted by the `stage2-wasi.js` program.
+//!
+//! Please do not rely on any of its implementation details (i.e. output). But make use of its
+//! format description as a schema (see [`config`][`config`]).
+
+/// Defines the declarative configuration format.
+pub mod config;
+
 use std::io::{Read, Write};
 
 const INST_SKIP: u32 = 1;

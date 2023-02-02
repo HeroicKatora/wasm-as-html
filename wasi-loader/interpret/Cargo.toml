@@ -8,3 +8,8 @@ name = "wasi_loader"
 
 [dependencies.bytemuck]
 version = "1.11"
+[dependencies.serde]
+version = "1"
+features = ["derive"]
+[dependencies.toml]
+version = "0.7"
