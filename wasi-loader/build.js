@@ -50,8 +50,31 @@ let cratePlugin = {
     build.onLoad({ filter: /.*/, namespace: 'cargo-crate-wasi-ns' }, async args => {
       return await cargo_artifact(args, 'wasm32-wasi');
     })
+
+    build.onResolve({ filter: /^wasi-config-internal-160e0777-0ea8-4def-88e7-c5297cfcb824:.*$/ }, args => ({
+      path: args.path + '.js',
+      namespace: 'wasi-interpreter-160e0777-0ea8-4def-88e7-c5297cfcb824',
+    }))
+
+    build.onLoad({ filter: /.*/, namespace: 'wasi-interpreter-160e0777-0ea8-4def-88e7-c5297cfcb824' }, async args => {
+      const contents = await fs.promises.readFile('interpret/interpret.js');
+
+      return {
+        contents,
+        resolveDir: 'node_modules',
+        loader: 'js',
+      };
+    });
   },
 }
+
+await esbuild.build({
+  entryPoints: ['interpret/interpret.js'],
+  bundle: true,
+  outfile: '../target/out-wasm-loader.mjs',
+  format: 'esm',
+  plugins: [cratePlugin],
+})
 
 // This plugin analyzes our DSL to resolve any JS dependencies needed to setup
 // the environment. It then resolves to a module which exports the instructions
@@ -72,14 +95,25 @@ let wasiInterpreterPlugin = {
     build.onLoad({ filter: /.*/, namespace: 'wasi-interpreter-ns' }, async args => {
       // Restore the true path of configuration.
       let cfgpath = args.path.replace(/[.]mjs$/, '').replace(/^wasi-config:/, '');
-      let contents = await fs.promises.readFile(cfgpath);
+      let configuration = await fs.promises.readFile(cfgpath);
+
+      const module = await import('../target/out-wasm-loader.mjs');
+      const binary = await module.loadInterpretedData(configuration);
+
+      let contents = `
+      async function load_config() {
+          return atob("${btoa(binary)}");
+      }
+
+      export { load_config };
+      `;
 
       return {
-        contents: await fs.promises.readFile('interpret/interpret.js'),
+        contents,
         resolveDir: 'node_modules',
         loader: 'js',
       };
-    })
+    });
   },
 }
 

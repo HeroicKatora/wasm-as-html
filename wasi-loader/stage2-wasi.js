@@ -1,6 +1,6 @@
 import { WASI, File, PreopenDirectory } from "@bjorn3/browser_wasi_shim";
 // This include is synthesized by `build.js:wasiInterpreterPlugin`.
-import { instructions, unzip } from 'wasi-config:config.toml'
+import { load_config } from 'wasi-config:config.toml'
 
 async function mount(promise) {
   const response = await promise;
@@ -89,7 +89,7 @@ async function mount(promise) {
         return ops[dir].path_open(im_flags, ops[path], im_oflags).fd_obj;
       },
       /* 12: unzip: (binary) => PreopenDirectory */
-      async (what) => throw 'Not available',
+      async (what) => {},
       /* 13: section */
       (what) => WebAssembly.Module.customSections(wasm, ops[what])
     ];
