@@ -1,4 +1,4 @@
-import { WASI, File, PreopenDirectory } from "@bjorn3/browser_wasi_shim";
+import { WASI, File, Directory, PreopenDirectory } from "@bjorn3/browser_wasi_shim";
 // This include is synthesized by `build.js:wasiInterpreterPlugin`.
 import { load_config } from 'wasi-config:config.toml'
 
@@ -13,7 +13,7 @@ async function mount(promise) {
     }));
 
   var configuration = {
-    args: [],
+    args: ["exe"],
     env: [],
     fds: {},
   };
@@ -22,26 +22,36 @@ async function mount(promise) {
   var stdout = new File([]);
   var stderr = new File([]);
 
-  let procself = new PreopenDirectory("0", {
-    "fd": new PreopenDirectory("fd", {
+  const file_array_buffer = async function(response, body_file) {
+    const newbody = new Response(body_file, {
+      'status': response.status,
+      'statusText': response.statusText,
+      'headers': response.headers,
+    });
+
+    return await newbody.arrayBuffer();
+  };
+
+  let procself = new Directory({
+    "fd": new Directory({
       "0": stdin,
       "1": stdout,
       "2": stderr,
     }),
-    "exe": new File(file_array_buffer),
+    "exe": new File(file_array_buffer(response, body_file)),
   });
   
   let dir = new PreopenDirectory(".", {
-      "proc": new PreopenDirectory("proc", {
+      "proc": new Directory({
         "self": procself,
         "0": procself,
       })
     });
 
   configuration.fds = [
-    dir.path_open(0, "stdin", 0).fd_obj,
-    dir.path_open(0, "stdout", 0).fd_obj,
-    dir.path_open(0, "stderr", 0).fd_obj,
+    dir.path_open(0, "proc/self/fd/0", 0).fd_obj,
+    dir.path_open(0, "proc/self/fd/1", 0).fd_obj,
+    dir.path_open(0, "proc/self/fd/2", 0).fd_obj,
     dir,
   ];
 
@@ -52,7 +62,7 @@ async function mount(promise) {
     /* Optional: we could pre-execute this on the config data, thus yielding
      * the `output` instructions.
      **/
-    let output = await instructions(wah_wasi_config_data[0]);
+    let output = await load_config(wah_wasi_config_data[0]);
     let data = new Uint8Array(output.buffer);
 
     let inst = new Uint32Array(output.buffer);
@@ -97,7 +107,7 @@ async function mount(promise) {
     document.documentElement.textContent = '\n';
 
     try {
-      while (iptr < inst.length) {
+      while (false && iptr < inst.length) {
         let fn_ = ops[inst.at(iptr)];
         let acnt = inst.at(iptr+1);
         let args = inst.subarray(iptr+2, iptr+2+acnt);
@@ -130,18 +140,24 @@ async function mount(promise) {
     wasi.start(inst);
   } finally {
     let decoder = new TextDecoder();
-    console.log(decoder.decode(stdin.data));
-    console.log(decoder.decode(stdout.data));
-    console.log(decoder.decode(stderr.data));
+    console.log('Result(stdin )', decoder.decode(stdin.data));
+    console.log('Result(stdout)', decoder.decode(stdout.data));
+    console.log('Result(stderr)', decoder.decode(stderr.data));
   }
 
-  if (filesystem !== undefined && (true || configuration.html)) {
-    let module = filesystem.path_open(0, "index.js", 0).fd_obj;
+  if (filesystem !== undefined) {
+    let module = filesystem.path_open(0, "proc/0/index.mjs", 0).fd_obj;
     let blob = new Blob([module.file.data.buffer], { type: 'application/javascript' });
     let blobURL = URL.createObjectURL(blob);
 
     let stage3_module = (await import(blobURL));
-    stage3_module.default({ stdin, stdout, stderr, filesystem });
+
+    stage3_module.default({
+      stdin,
+      stdout,
+      stderr,
+      filesystem
+    });
   }
 }
 
