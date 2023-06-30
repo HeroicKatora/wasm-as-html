@@ -9,7 +9,12 @@ pub struct Config {
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Input {
+    /// Literal arguments to use.
+    pub args: Vec<String>,
+    /// Define environment variables to use.
+    /// This is an array but most programs will expect key-value assignments.
     pub env: Vec<String>,
+    /// Define how the file system is created from data.
     pub root: Option<FsInMode>,
     /// Identifies the name of the data section to use.
     ///
@@ -21,9 +26,11 @@ pub struct Input {
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum FsInMode {
+    /// Initialize a file system by unzipping the data section.
     Unzip,
 }
 
+/// FIXME: Do we?
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Output {
