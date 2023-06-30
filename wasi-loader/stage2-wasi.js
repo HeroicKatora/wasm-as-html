@@ -3,10 +3,17 @@ import { WASI, File, PreopenDirectory } from "@bjorn3/browser_wasi_shim";
 import { instructions, unzip } from 'wasi-config:config.toml'
 
 async function mount(promise) {
-  let wasm = await WebAssembly.compileStreaming(await promise);
+  const response = await promise;
+  const [body_wasm, body_file] = response.body.tee();
+
+  let wasm = await WebAssembly.compileStreaming(new Response(body_wasm, {
+      'status': response.status,
+      'statusText': response.statusText,
+      'headers': response.headers,
+    }));
 
   var configuration = {
-    args: ["bin", "-f", "hello.hq9+"],
+    args: [],
     env: [],
     fds: {},
   };
@@ -14,12 +21,21 @@ async function mount(promise) {
   var stdin = new File([]);
   var stdout = new File([]);
   var stderr = new File([]);
+
+  let procself = new PreopenDirectory("0", {
+    "fd": new PreopenDirectory("fd", {
+      "0": stdin,
+      "1": stdout,
+      "2": stderr,
+    }),
+    "exe": new File(file_array_buffer),
+  });
   
   let dir = new PreopenDirectory(".", {
-      "stdin": stdin,
-      "stdout": stdout,
-      "stderr": stderr,
-      "test.hq9+": new File(new TextEncoder("utf-8").encode(`HHHH+Q`)),
+      "proc": new PreopenDirectory("proc", {
+        "self": procself,
+        "0": procself,
+      })
     });
 
   configuration.fds = [
@@ -73,7 +89,7 @@ async function mount(promise) {
         return ops[dir].path_open(im_flags, ops[path], im_oflags).fd_obj;
       },
       /* 12: unzip: (binary) => PreopenDirectory */
-      async (what) => await unzip(ops[what]),
+      async (what) => throw 'Not available',
       /* 13: section */
       (what) => WebAssembly.Module.customSections(wasm, ops[what])
     ];
