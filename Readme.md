@@ -28,6 +28,46 @@ See [examples/yew/Readme.md][examples/yew/Readme.md] for a detailed description.
 
 Or [TodoMVC deployed on gh-pages](https://heroickatora.github.io/wasm-as-html/examples/yew/todomvc.html).
 
+## Overview
+
+The program inserts bootstrap sections into the WebAssembly module. These are
+designed that the respective readers of other formats (html, zip, pdf)
+recognize them *instead* of the WebAssembly module.
+
+For HTML:
+- A stage0 section makes the HTML parser stop after a short header, rewrites
+  the main document content to a dummy page, then jumps to a module loaded from
+  another section by loading that as an ES-Module. It must be the first section
+  in the WebAssembly file; and it must be in a specific range of byte-lengths.
+- The stage1 section takes this control and sets up a usable environment
+  comparable to a single-page app. It replaces the dummy page with an initial
+  page from a specially named custom section in the original module. We're free
+  to run any Javascript in this module already.
+- The stage2 section takes control as if some SPA module.
+    - The stage2-yew case will load an application compiled, assembled, and
+      packed with Yew, wasm-bindgen (or trunk if needed).
+    - The stage2-wasi will now transfer control over to WASI as the main
+      driver. It begins by invoking another intermediate stage program to
+      control the setup of the WASI system, similar to Unix `init`.
+      See [stage2](wasi-loader/Readme.md) for more.
+- The default stage3 will now inspect and process the bundled zip data. This
+  module takes the role of bootloader for the original module. The zip-file
+  will be treated similar to an initial disk. The astute reader might instead
+  use another mechanism. The author chose this as it adds transparency to the
+  contents of the initial file system and its configuration files.
+- The default stage4, finally, is the original WebAssembly module into which
+  all these other files are packed!
+
+For PDF [Work-In-Progress]:
+- There must be a stage0 header in the first 1kB. This will pretend to open a
+  binary stream element to skip over most sections. Then an original document
+  is embedded.
+- As stage1, the Acrobat JavaScript API might be usable but the author does not
+  particular like Acrobat's software development outcomes, in non-commercial
+  settings anyways. Media and GPU embeddings are just worse and also badly
+  sandboxed versions of the equivalent HTML specifications; and privacy
+  nightmares. Nothing was learned from Flash. Experiment on your own.
+
 ## Experimental
 
 There's an experimental `--edit` flag. This replaces stage1 with an auto-reload
