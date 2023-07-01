@@ -14,8 +14,9 @@ features = ["derive"]
 members = [
   ".",
   "wasi-loader/interpret",
-  "wasi-loader/unzip",
+  "stage3/unzip",
 
+  # Application for stage3/unzip
   "examples/wasi/plotters-normal-2d",
 ]
 

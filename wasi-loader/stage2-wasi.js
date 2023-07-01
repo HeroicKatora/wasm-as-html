@@ -58,14 +58,18 @@ async function mount(promise) {
   let wah_wasi_config_data = WebAssembly.Module.customSections(wasm, 'wah_wasi_config');
   wah_wasi_config_data.unshift(new TextEncoder('utf-8').encode('{}'));
 
-  if (wah_wasi_config_data.length > 0) {
+  if (true || wah_wasi_config_data.length > 0) {
+    const instr_debugging = console.log;
     /* Optional: we could pre-execute this on the config data, thus yielding
      * the `output` instructions.
      **/
     let output = await load_config(wah_wasi_config_data[0]);
-    let data = new Uint8Array(output.buffer);
+    console.log('Instructions', output);
 
+    let data = new Uint8Array(output.buffer);
     let inst = new Uint32Array(output.buffer);
+    console.log('Instructions', inst);
+    console.log('Data', data);
     var iptr = 0;
 
     // The configuration output is 'script' in a simple, static assignment
@@ -75,40 +79,78 @@ async function mount(promise) {
       /* 0: the configuration object */
       configuration,
       /* 1: skip */ 
-      (cnt) => iptr += cnt,
+      (cnt) => {
+        instr_debugging(`skip ${cnt} to ${iptr+cnt}`);
+        return iptr += cnt;
+      },
       /* 2: string */
-      (ptr, len) => new TextDecoder('utf-8').decode(data.subarray(ptr, ptr+len)),
+      (ptr, len) => {
+        instr_debugging(`decode ${ptr} to ${ptr+len}`);
+        return new TextDecoder('utf-8').decode(data.subarray(ptr, ptr+len));
+      },
       /* 3: json */
-      (ptr, len) => JSON.parse(output.subarray(ptr, ptr+len)),
+      (ptr, len) => {
+        instr_debugging(`json ${ptr} to ${ptr+len}`);
+        return JSON.parse(output.subarray(ptr, ptr+len));
+      },
       /* 4: integer const */
-      (c) => c,
+      (c) => {
+        instr_debugging(`const ${c}`);
+        return c;
+      },
       /* 5: array */
-      (ptr, len) => output.subarray(ptr, ptr+len),
+      (ptr, len) => {
+        instr_debugging(`array ${ptr} to ${ptr+len}`);
+        return output.subarray(ptr, ptr+len);
+      },
       /* 6: get */
-      (from, idx) => (ops[from])[ops[idx]],
+      (from, idx) => {
+        instr_debugging('get', from, ops[idx], (ops[from])[ops[idx]]);
+        return (ops[from])[ops[idx]];
+      },
       /* 7: set */
-      (into, idx, what) => (ops[into])[ops[idx]] = ops[what],
+      (into, idx, what) => {
+        instr_debugging('set', into, ops[idx], ops[what]);
+        return (ops[into])[ops[idx]] = ops[what];
+      },
       /* 8: File */
-      (what) => new File(ops[what]),
+      (what) => {
+        instr_debugging('file', ops[what]);
+        return new File(ops[what]);
+      },
       /* 9: Directory */
-      (what) => new Directory(ops[what]),
+      (what) => {
+        instr_debugging('directory', ops[what]);
+        return new Directory(ops[what]);
+      },
       /* 10: PreopenDirectory */
-      (where, what) => new PreopenDirectory(ops[where], ops[what]),
+      (where, what) => {
+        instr_debugging('preopen directory', ops[where], ops[what]);
+        return new PreopenDirectory(ops[where], ops[what]);
+      },
       /* 11: Directory.open */
       (dir, im_flags, path, im_oflags) => {
+        instr_debugging('diropen', dir, im_flags, ops[path], im_oflags);
         return ops[dir].path_open(im_flags, ops[path], im_oflags).fd_obj;
       },
       /* 12: unzip: (binary) => PreopenDirectory */
-      async (what) => {},
+      async (what) => {
+        instr_debugging('unzip (unimplemented)');
+        return;
+      },
       /* 13: section */
-      (what) => WebAssembly.Module.customSections(wasm, ops[what])
+      (what) => {
+        instr_debugging('wasm', ops[what]);
+        return WebAssembly.Module.customSections(wasm, ops[what]);
+      },
     ];
 
     document.documentElement.textContent = '\n';
 
     try {
-      while (false && iptr < inst.length) {
+      while (iptr < inst.length) {
         let fn_ = ops[inst.at(iptr)];
+        console.log(fn_);
         let acnt = inst.at(iptr+1);
         let args = inst.subarray(iptr+2, iptr+2+acnt);
 
@@ -116,6 +158,7 @@ async function mount(promise) {
         iptr += 2 + acnt;
       }
     } catch (e) {
+      console.log('Instructions failed', e);
       document.documentElement.textContent += '\nOps: '+ops;
       document.documentElement.textContent += '\nError: '+e;
     }

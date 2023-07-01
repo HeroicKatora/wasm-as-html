@@ -98,11 +98,16 @@ let wasiInterpreterPlugin = {
       let configuration = await fs.promises.readFile(cfgpath);
 
       const module = await import('../target/out-wasm-loader.mjs');
-      const binary = await module.loadInterpretedData(configuration);
+      const codepoints = await module.loadInterpretedData(configuration);
+      const binary = new Uint8Array(codepoints.buffer);
 
+      // Roundtrip through numbers, not base64. `atob` work on _strings_ but we
+      // do not guarantee anything like that, we just need raw bytes in any
+      // order they are in. So we can't safely involve TextDecoder on the binary.
       let contents = `
       async function load_config() {
-          return atob("${btoa(binary)}");
+          const data = "${binary.join()}".split(",");
+          return Uint8Array.from(data, c => parseInt(c, 10));
       }
 
       export { load_config };

@@ -60,6 +60,13 @@ fn main() -> Result<(), std::io::Error> {
         }
     }
 
+    for extra in &args.extra_section {
+        encoder.section(&wasm_encoder::CustomSection {
+            name: &extra.name,
+            data: &std::fs::read(&extra.from_file)?,
+        });
+    }
+
     if let Some(zip_file) = &args.zip {
         let zip_data = std::fs::read(zip_file)?;
         let name = args
@@ -90,6 +97,12 @@ fn main() -> Result<(), std::io::Error> {
 
 fn parse_err(_: wasmparser::BinaryReaderError) -> std::io::Error {
     todo!()
+}
+
+#[derive(Clone, Debug)]
+struct ExtraSection {
+    name: String,
+    from_file: PathBuf,
 }
 
 #[derive(Parser)]
@@ -124,6 +137,10 @@ struct Args {
     /// last 512 bytes).
     #[arg(short, long = "trailing-zip", alias = "zip")]
     zip: Option<PathBuf>,
+
+    #[arg(long = "add-section")]
+    extra_section: Vec<ExtraSection>,
+
     /// A customized section name to use for the final zip section.
     ///
     /// The section is named `wah_polyglot_stage2_data` by default.
@@ -140,4 +157,19 @@ struct Args {
     /// Must set the environment variable `WAH_POLYGLOT_EXPERIMENTAL` to use.
     #[arg(long, alias = "dev")]
     edit: bool,
+}
+
+impl core::str::FromStr for ExtraSection {
+    type Err = String;
+
+    fn from_str(val: &str) -> Result<Self, Self::Err> {
+        let Some((key, suffix)) = val.split_once(",") else {
+            return Err("expected `section_name,file_name`".into());
+        };
+
+        Ok(ExtraSection {
+            name: key.into(),
+            from_file: suffix.into(),
+        })
+    }
 }
