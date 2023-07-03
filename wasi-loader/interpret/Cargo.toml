@@ -1,0 +1,15 @@
+[package]
+name = "wasi_loader"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "wasi_loader"
+
+[dependencies.bytemuck]
+version = "1.11"
+[dependencies.serde]
+version = "1"
+features = ["derive"]
+[dependencies.toml]
+version = "0.7"

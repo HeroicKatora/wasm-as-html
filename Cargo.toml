@@ -9,3 +9,17 @@ wasmparser = "0.95"
 [dependencies.clap]
 version = "4"
 features = ["derive"]
+
+[workspace]
+members = [
+  ".",
+  "wasi-loader/interpret",
+  "stage3/unzip",
+
+  # Application for stage3/unzip
+  "examples/wasi/plotters-normal-2d",
+]
+
+[profile.release]
+opt-level = 's'
+strip = true
