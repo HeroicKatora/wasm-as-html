@@ -1,4 +1,4 @@
-import { WASI, File, Directory, PreopenDirectory } from "@bjorn3/browser_wasi_shim";
+import { WASI, File, OpenFile, Directory, PreopenDirectory } from "@bjorn3/browser_wasi_shim";
 // This include is synthesized by `build.js:wasiInterpreterPlugin`.
 import { load_config } from 'wasi-config:config.toml'
 
@@ -15,12 +15,8 @@ async function mount(promise) {
   var configuration = {
     args: ["exe"],
     env: [],
-    fds: {},
+    fds: [],
   };
-
-  var stdin = new File([]);
-  var stdout = new File([]);
-  var stderr = new File([]);
 
   const file_array_buffer = async function(response, body_file) {
     const newbody = new Response(body_file, {
@@ -32,49 +28,34 @@ async function mount(promise) {
     return await newbody.arrayBuffer();
   };
 
-  let procself = new Directory({
-    "fd": new Directory({
-      "0": stdin,
-      "1": stdout,
-      "2": stderr,
-    }),
-    "exe": new File(file_array_buffer(response, body_file)),
-  });
-  
-  let dir = new PreopenDirectory(".", {
-      "proc": new Directory({
-        "self": procself,
-        "0": procself,
-      })
-    });
-
-  configuration.fds = [
-    dir.path_open(0, "proc/self/fd/0", 0).fd_obj,
-    dir.path_open(0, "proc/self/fd/1", 0).fd_obj,
-    dir.path_open(0, "proc/self/fd/2", 0).fd_obj,
-    dir,
-  ];
-
   let wah_wasi_config_data = WebAssembly.Module.customSections(wasm, 'wah_wasi_config');
   wah_wasi_config_data.unshift(new TextEncoder('utf-8').encode('{}'));
 
-  if (true || wah_wasi_config_data.length > 0) {
+  if (wah_wasi_config_data.length > 1) {
+    // We can not handle this. Okay, granted, we could somehow put it into the
+    // configuration object and let the script below handle it. It could be
+    // said that I have not decided how to handle it. The section is ignored
+    // anyways for now.
+    throw `Multiple configuration sections 'wah_wasi_config' detected`;
+  } else {
     const instr_debugging = console.log;
     /* Optional: we could pre-execute this on the config data, thus yielding
      * the `output` instructions.
      **/
-    let output = await load_config(wah_wasi_config_data[0]);
-    console.log('Instructions', output);
+    let raw_configuration = await load_config(wah_wasi_config_data[0]);
 
-    let data = new Uint8Array(output.buffer);
-    let inst = new Uint32Array(output.buffer);
-    console.log('Instructions', inst);
-    console.log('Data', data);
+    let data = new Uint8Array(raw_configuration.buffer);
+    let instruction_stream = new Uint32Array(raw_configuration.buffer);
     var iptr = 0;
 
     // The configuration output is 'script' in a simple, static assignment
     // scripting language. We have objects and each instruction calls one of
     // them with some arguments.
+    //
+    // Why are we having a script here, and not eval'ing Js? Well.. For once I
+    // like have a rather small but configurable section. Js on the other hand
+    // would be quite verbose. If in doubt, we have a `function` constructor as
+    // an escape hatch?
     const ops = [
       /* 0: the configuration object */
       configuration,
@@ -91,7 +72,7 @@ async function mount(promise) {
       /* 3: json */
       (ptr, len) => {
         instr_debugging(`json ${ptr} to ${ptr+len}`);
-        return JSON.parse(output.subarray(ptr, ptr+len));
+        return JSON.parse(data.subarray(ptr, ptr+len));
       },
       /* 4: integer const */
       (c) => {
@@ -101,7 +82,7 @@ async function mount(promise) {
       /* 5: array */
       (ptr, len) => {
         instr_debugging(`array ${ptr} to ${ptr+len}`);
-        return output.subarray(ptr, ptr+len);
+        return data.subarray(ptr, ptr+len);
       },
       /* 6: get */
       (from, idx) => {
@@ -133,37 +114,48 @@ async function mount(promise) {
         instr_debugging('diropen', dir, im_flags, ops[path], im_oflags);
         return ops[dir].path_open(im_flags, ops[path], im_oflags).fd_obj;
       },
-      /* 12: unzip: (binary) => PreopenDirectory */
-      async (what) => {
-        instr_debugging('unzip (unimplemented)');
-        return;
+      /* 12: OpenFile */
+      (what) => {
+        instr_debugging('fileopen', ops[what]);
+        return new OpenFile(ops[what]);
       },
       /* 13: section */
       (what) => {
         instr_debugging('wasm', ops[what]);
         return WebAssembly.Module.customSections(wasm, ops[what]);
       },
+      /* 14: no-op */
+      function() {
+        instr_debugging('noop', arguments);
+        return {};
+      },
+      /* 15: function */
+      (what) => {
+        instr_debugging('function', ops[what]);
+        return new Function(ops[what]);
+      },
     ];
 
+    ops[255] = undefined;
     document.documentElement.textContent = '\n';
 
     try {
-      while (iptr < inst.length) {
-        let fn_ = ops[inst.at(iptr)];
-        console.log(fn_);
-        let acnt = inst.at(iptr+1);
-        let args = inst.subarray(iptr+2, iptr+2+acnt);
+      while (iptr < instruction_stream.length) {
+        let fn_ = ops[instruction_stream.at(iptr)];
+        let acnt = instruction_stream.at(iptr+1);
+        let args = instruction_stream.subarray(iptr+2, iptr+2+acnt);
 
-        ops.push(await fn_.apply(null, args));
+        ops.push(fn_.apply(null, args));
         iptr += 2 + acnt;
       }
     } catch (e) {
       console.log('Instructions failed', e);
-      document.documentElement.textContent += '\nOps: '+ops;
+      console.log(ops);
+      document.documentElement.textContent += '\nOops: ';
       document.documentElement.textContent += '\nError: '+e;
     }
 
-    document.documentElement.textContent += JSON.stringify(ops, (_, v) => typeof v === 'bigint' ? v.toString() : v);
+    document.documentElement.textContent += `Initialized towards stage3 in ${ops.length-256} steps`;
   }
 
   // document.documentElement.textContent = JSON.stringify(configuration);
@@ -174,18 +166,33 @@ async function mount(promise) {
   let filesystem = configuration.fds[3];
 
   let wasi = new WASI(args, env, fds);
+  // The primary is setup as the executable image of proc/0/exe (initially the stage4).
+  const primary_exe = filesystem.path_open(0, "sbin/init", 0).fd_obj;
 
-  let inst = await WebAssembly.instantiate(wasm, {
+  // FIXME: error handling?
+  // If this is still something then let's replace.
+  const primary_wasm = await WebAssembly.compileStreaming(new Response(
+    new Blob([primary_exe.file.data.buffer], { type: 'application/javascript' }),
+    { 'headers': response.headers }));
+
+  let inst = await WebAssembly.instantiate(primary_wasm, {
     "wasi_snapshot_preview1": wasi.wasiImport,
-  });  
+  });
+
+  const [stdin, stdout, stderr] = configuration.fds;
 
   try {
-    wasi.start(inst);
+    try {
+      wasi.start(inst);
+    } catch (e) {
+      document.documentElement.innerHTML += `<p>Failed initialization: ${e}</p>`;
+      document.documentElement.innerHTML += `<p>Result(stdout) ${new TextDecoder().decode(stdout.file.data)}</p>`;
+      document.documentElement.innerHTML += `<p>Result(stderr) ${new TextDecoder().decode(stderr.file.data)}</p>`;
+    }
   } finally {
-    let decoder = new TextDecoder();
-    console.log('Result(stdin )', decoder.decode(stdin.data));
-    console.log('Result(stdout)', decoder.decode(stdout.data));
-    console.log('Result(stderr)', decoder.decode(stderr.data));
+    console.log('Result(stdin )', new TextDecoder().decode(stdin.file.data));
+    console.log('Result(stdout)', new TextDecoder().decode(stdout.file.data));
+    console.log('Result(stderr)', new TextDecoder().decode(stderr.file.data));
   }
 
   if (filesystem !== undefined) {

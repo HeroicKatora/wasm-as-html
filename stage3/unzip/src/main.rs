@@ -19,3 +19,32 @@ pub fn main() -> Result<(), zip::result::ZipError> {
 
     Ok(())
 }
+
+enum ProcResult {
+    Ok,
+    Err(zip::result::ZipError),
+}
+
+impl From<Result<(), zip::result::ZipError>> for ProcResult {
+    fn from(res: Result<(), zip::result::ZipError>) -> Self {
+        match res {
+            Ok(()) => ProcResult::Ok,
+            Err(err) => ProcResult::Err(err),
+        }
+    }
+}
+
+impl std::process::Termination for ProcResult {
+    fn report(self) -> std::process::ExitCode {
+        let ProcResult::Err(err) = self else {
+            return std::process::ExitCode::SUCCESS;
+        };
+
+        use std::io::Write;
+        let stderr = std::io::stderr();
+        match write!(stderr.lock(), "{}", err) {
+            Ok(_) => std::process::ExitCode::FAILURE,
+            Err(_) => std::process::ExitCode::from(127),
+        }
+    }
+}
