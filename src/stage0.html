@@ -16,9 +16,9 @@
     /* Error handling, in case we need it */
     let error = document.getElementById('stage0_error');
     try {
-      let doc = await fetch(window.location.href);
+      let doc = await fetch(document.location);
       let bytes = await doc.arrayBuffer();
-      let wasm = new WebAssembly.Module(bytes);
+      let wasm = await WebAssembly.compileStreaming(new Response(bytes, { headers: { 'content-type': 'application/wasm' }}));
 
       let stage1 = WebAssembly.Module.customSections(wasm, 'wah_polyglot_stage1')[0];
       let blob = new Blob([stage1], { type: 'application/javascript' });

@@ -1,4 +1,4 @@
-A packer that adds a webpage to WASM module, making it self-hosted!
+A packer that adds a webpage to WASI application, making it self-hosted!
 
 ## Motivation
 
@@ -9,12 +9,13 @@ you to preserve the WebAssembly interpretation, unchanged, while adding an HTML
 loader as a sort of platform polyfill, to substitute the native environment
 with a billion-dollar platform independent sandbox.
 
-**This is not a hack project, nor a joke**. Granted, it started out that way
-but there is surprising depth of engineering that accumulated after the initial
-rush of ideas. Without hyperbole, I want to explore turning it into as much of
-a serious document format as PDF. The wrapper provides a robust foundation for
-wrapping full applications. With the readme below, the system can be understood
-fully and all its parts adjusted. Importantly, **You** can do this.
+**This is not only a proof-of-concept, nor a joke**. Granted, it started out
+that way but there is surprising depth of engineering that accumulated after
+the initial rush of ideas. Without hyperbole, I want to explore turning it into
+as much of a serious document format as PDF. The wrapper provides a robust
+foundation for wrapping full applications. With the readme below, the system
+can be understood fully and all its parts adjusted. Importantly, **You** can do
+this.
 
 ## How to use it
 
