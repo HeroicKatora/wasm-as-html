@@ -351,6 +351,7 @@ function getImports() {
         var ptr0 = getUint32Memory0()[arg0 / 4];
         var len0 = getUint32Memory0()[arg0 / 4 + 1];
         const ret = getStringFromWasm0(ptr0, len0);
+	    console.log('string', arg0, ptr0, len0, ret);
         return addHeapObject(ret);
     };
     imports.wbg.__wbg_new_b525de17f44a8943 = function() {
@@ -529,7 +530,12 @@ function getImports() {
         return ret;
     }, arguments) };
     imports.wbg.__wbg_set_6aa458a4ebdb65cb = function() { return handleError(function (arg0, arg1, arg2) {
-        const ret = Reflect.set(getObject(arg0), getObject(arg1), getObject(arg2));
+	    const obj = getObject(arg0);
+	    const key = getObject(arg1);
+	    const val = getObject(arg2);
+	    console.log(arg0, arg1, arg2);
+	    console.log('Set refl reflect', ''+obj, ''+key, ''+val);
+        const ret = Reflect.set(obj, key, val);
         return ret;
     }, arguments) };
     imports.wbg.__wbg_stringify_029a979dfb73aa17 = function() { return handleError(function (arg0) {
@@ -594,7 +600,11 @@ function getImports() {
         var len0 = getUint32Memory0()[arg1 / 4 + 1];
         var ptr1 = getUint32Memory0()[arg2 / 4];
         var len1 = getUint32Memory0()[arg2 / 4 + 1];
-        getObject(arg0).setAttribute(getStringFromWasm0(ptr0, len0), getStringFromWasm0(ptr1, len1));
+	    const key = getStringFromWasm0(ptr0, len0);
+	    const val = getStringFromWasm0(ptr1, len1);
+	    const obj = getObject(arg0);
+	    console.log('Set attr reflect', obj, key, val);
+        obj.setAttribute(key, val);
     }, arguments) };
     imports.wbg.__wbg_instanceof_Window_e266f02eee43b570 = function(arg0) {
         let result;
@@ -631,7 +641,11 @@ function getImports() {
         var len0 = getUint32Memory0()[arg1 / 4 + 1];
         var ptr1 = getUint32Memory0()[arg2 / 4];
         var len1 = getUint32Memory0()[arg2 / 4 + 1];
-        getObject(arg0).setProperty(getStringFromWasm0(ptr0, len0), getStringFromWasm0(ptr1, len1));
+	    const key = getStringFromWasm0(ptr0, len0);
+	    const val = getStringFromWasm0(ptr1, len1);
+	    const obj = getObject(arg0);
+	    console.log('Set prop reflect', obj, key, val);
+        obj.setProperty(key, val);
     }, arguments) };
     imports.wbg.__wbg_document_950215a728589a2d = function(arg0) {
         const ret = getObject(arg0).document;
@@ -975,7 +989,10 @@ function getImports() {
         return addHeapObject(ret);
     };
     imports.wbg.__wbg_createTexture_ea9e43be4047490d = function(arg0, arg1) {
-        const ret = getObject(arg0).createTexture(getObject(arg1));
+	    const v0 = getObject(arg0);
+	    const v1 = getObject(arg1);
+	    console.log(arg0, arg1, v0, v1);
+        const ret = v0.createTexture(v1);
         return addHeapObject(ret);
     };
     imports.wbg.__wbg_popErrorScope_e2a2b1b7559dad18 = function(arg0) {
