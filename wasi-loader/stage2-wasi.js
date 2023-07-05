@@ -2,6 +2,46 @@ import { WASI, File, OpenFile, Directory, PreopenDirectory } from "@bjorn3/brows
 // This include is synthesized by `build.js:wasiInterpreterPlugin`.
 import { load_config } from 'wasi-config:config.toml'
 
+async function fallback_shell(configuration, error) {
+  document.documentElement.innerHTML = `<p>Missing boot exec</p>`;
+  if (error !== undefined) {
+    document.documentElement.innerHTML = `<p>Error: ${error}</p>`;
+  }
+
+  document.documentElement.innerHTML += `<p>WAH rescue shell</p>`;
+  // FIXME: here we would search for a special section, that can _optionally_
+  // added if the file size is not too consequential. This would then contain
+  // an actual shell compiled as a separate single-module ESM, a new stage2/SPA
+  // basically.
+  const rootfs = configuration.fds[3];
+
+  function mkDirElement(dir) {
+    const list = document.createElement('ul');
+    for (const [name, entry] of Object.entries(dir.contents)) {
+      const el = document.createElement('li');
+      el.innerText = name;
+      if (entry instanceof Directory) {
+        const sublist = mkDirElement(entry);
+        el.appendChild(sublist);
+      } else {
+        el.innerText = '';
+        const btn = document.createElement('a');
+        const blob = new Blob([entry.data]);
+        btn.innerText = name;
+        btn.download = name;
+        btn.href = URL.createObjectURL(blob);
+        el.appendChild(btn);
+      }
+
+      list.appendChild(el);
+    }
+    return list;
+  };
+
+  document.documentElement.innerHTML += `<p>Filesystem: </p>`;
+  document.documentElement.appendChild(mkDirElement(rootfs.dir));
+}
+
 async function mount(promise) {
   const response = await promise;
   const [body_wasm, body_file] = response.body.tee();
