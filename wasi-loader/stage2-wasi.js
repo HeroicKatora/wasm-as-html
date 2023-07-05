@@ -12,12 +12,6 @@ async function mount(promise) {
       'headers': response.headers,
     }));
 
-  var configuration = {
-    args: ["exe"],
-    env: [],
-    fds: [],
-  };
-
   const file_array_buffer = async function(response, body_file) {
     const newbody = new Response(body_file, {
       'status': response.status,
@@ -26,6 +20,15 @@ async function mount(promise) {
     });
 
     return await newbody.arrayBuffer();
+  };
+
+  var configuration = {
+    args: ["exe"],
+    env: [],
+    fds: [],
+    // FIXME: sort out the mess of naming?
+    wasm: await file_array_buffer(response, body_file),
+    wasm_module: wasm,
   };
 
   let wah_wasi_config_data = WebAssembly.Module.customSections(wasm, 'wah_wasi_config');
@@ -119,7 +122,8 @@ async function mount(promise) {
         instr_debugging('fileopen', ops[what]);
         return new OpenFile(ops[what]);
       },
-      /* 13: section */
+      /* 13: section */ // FIXME: maybe pass the module itself explicitly?
+      // Do we want to support compiling modules already at this point?
       (what) => {
         instr_debugging('wasm', ops[what]);
         return WebAssembly.Module.customSections(wasm, ops[what]);
@@ -164,26 +168,27 @@ async function mount(promise) {
   let env = configuration.env;
   let fds = configuration.fds;
   let filesystem = configuration.fds[3];
+  configuration.WASI = WASI;
 
-  let wasi = new WASI(args, env, fds);
+  configuration.wasi = new WASI(args, env, fds);
   // The primary is setup as the executable image of proc/0/exe (initially the stage4).
-  const primary_exe = filesystem.path_open(0, "sbin/init", 0).fd_obj;
+  const boot_exe = filesystem.path_open(0, "boot/init", 0).fd_obj;
 
   // FIXME: error handling?
   // If this is still something then let's replace.
   const primary_wasm = await WebAssembly.compileStreaming(new Response(
-    new Blob([primary_exe.file.data.buffer], { type: 'application/javascript' }),
+    new Blob([boot_exe.file.data.buffer], { type: 'application/javascript' }),
     { 'headers': response.headers }));
 
   let inst = await WebAssembly.instantiate(primary_wasm, {
-    "wasi_snapshot_preview1": wasi.wasiImport,
+    "wasi_snapshot_preview1": configuration.wasi.wasiImport,
   });
 
   const [stdin, stdout, stderr] = configuration.fds;
 
   try {
     try {
-      wasi.start(inst);
+      configuration.wasi.start(inst);
     } catch (e) {
       document.documentElement.innerHTML += `<p>Failed initialization: ${e}</p>`;
       document.documentElement.innerHTML += `<p>Result(stdout) ${new TextDecoder().decode(stdout.file.data)}</p>`;
@@ -195,19 +200,20 @@ async function mount(promise) {
     console.log('Result(stderr)', new TextDecoder().decode(stderr.file.data));
   }
 
-  if (filesystem !== undefined) {
-    let module = filesystem.path_open(0, "proc/0/index.mjs", 0).fd_obj;
-    let blob = new Blob([module.file.data.buffer], { type: 'application/javascript' });
-    let blobURL = URL.createObjectURL(blob);
+  let module = filesystem.path_open(0, "boot/index.mjs", 0).fd_obj;
+  if (module == null) {
+    return await fallback_shell(configuration);
+  }
 
-    let stage3_module = (await import(blobURL));
+  let blob = new Blob([module.file.data.buffer], { type: 'application/javascript' });
+  let blobURL = URL.createObjectURL(blob);
+  let stage3_module = (await import(blobURL));
 
-    stage3_module.default({
-      stdin,
-      stdout,
-      stderr,
-      filesystem
-    });
+  console.log('executing boot module');
+  try {
+    await stage3_module.default(configuration);
+  } catch (e) {
+    await fallback_shell(configuration, e);
   }
 }
 

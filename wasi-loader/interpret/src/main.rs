@@ -37,18 +37,29 @@ pub fn main() -> Result<(), std::io::Error> {
     // Here, parse the configuration and setup WASI.
     let mut stream = StreamState::default();
 
-    let section = mk_stage3(&mut stream);
+    // The next loader configuring from WASM.
+    let stage3 = mk_stage3(&mut stream);
+    // the final executable for which we prepare an environment.
+    let exe_file = mk_exe(&mut stream);
     let cfg_fds = mk_cfg_fds(&mut stream);
 
-    let exe_file = stream.push(&[INST_FILE, 1, section], &[]);
+    let dir_boot = mk_boot(&mut stream, stage3);
     let dir_sbin = mk_sbin(&mut stream, exe_file);
-    let dir_proc = mk_proc(&mut stream, cfg_fds, exe_file);
-    mk_preopen(&mut stream, cfg_fds, Preopen { dir_proc, dir_sbin });
+    let dir_proc = mk_proc(&mut stream, exe_file);
+    mk_preopen(&mut stream, cfg_fds, Preopen { dir_boot, dir_proc, dir_sbin, exe_file });
 
     let byte_stream = stream.encode();
     std::io::stdout().write_all(&byte_stream)?;
 
     Ok(())
+}
+
+fn mk_exe(stream: &mut StreamState) -> u32 {
+    const STR_WASM: &str = "wasm";
+
+    let txt_wasm = stream.mk_utf8(STR_WASM);
+    let wasm = stream.push(&[INST_GET, 2, STACK_CFG, txt_wasm], &[]);
+    stream.push(&[INST_FILE, 1, wasm], &[])
 }
 
 fn mk_stage3(stream: &mut StreamState) -> u32 {
@@ -58,7 +69,7 @@ fn mk_stage3(stream: &mut StreamState) -> u32 {
     let sections = stream.push(&[INST_SECTION, 1, section_txt], &[]);
     let c0 = stream.mk_const(0);
     let section = stream.push(&[INST_GET, 2, sections, c0], &[]);
-    section
+    stream.push(&[INST_FILE, 1, section], &[])
 }
 
 fn mk_cfg_fds(stream: &mut StreamState) -> u32 {
@@ -69,26 +80,58 @@ fn mk_cfg_fds(stream: &mut StreamState) -> u32 {
 }
 
 struct Preopen {
+    dir_boot: u32,
     dir_sbin: u32,
     dir_proc: u32,
+    exe_file: u32,
 }
 
 fn mk_preopen(stream: &mut StreamState, fds: u32, open: Preopen) {
+    const STR_BOOT: &str = "boot";
     const STR_PROC: &str = "proc";
     const STR_SBIN : &str = "sbin";
-    const STR_PREOPEN: &str = ".";
+    const STR_PREOPEN: &str = "/";
 
+    let txt_boot = stream.mk_utf8(STR_BOOT);
     let txt_proc = stream.mk_utf8(STR_PROC);
     let txt_sbin = stream.mk_utf8(STR_SBIN);
     let txt_preopen = stream.mk_utf8(STR_PREOPEN);
 
     let dir = stream.mk_dict();
+    stream.push(&[INST_SET, 3, dir, txt_boot, open.dir_boot], &[]);
     stream.push(&[INST_SET, 3, dir, txt_proc, open.dir_proc], &[]);
     stream.push(&[INST_SET, 3, dir, txt_sbin, open.dir_sbin], &[]);
     let dir_preopen = stream.push(&[INST_PREOPEN, 2, txt_preopen, dir], &[]);
 
+    // These are the files for the boot process itself, not the exe afterwards.
+    let stdin = open.exe_file;
+    let stdout = stream.push(&[INST_ARRAY, 2, 0, 0], &[]);
+    let stdout = stream.push(&[INST_FILE, 1, stdout], &[]);
+    let stderr = stream.push(&[INST_ARRAY, 2, 0, 0], &[]);
+    let stderr = stream.push(&[INST_FILE, 1, stderr], &[]);
+
+    let c0 = stream.mk_const(0);
+    let c1 = stream.mk_const(1);
+    let c2 = stream.mk_const(2);
+
+    let ostdin = stream.push(&[INST_OPEN_FILE, 1, stdin], &[]);
+    stream.push(&[INST_SET, 3, fds, c0, ostdin], &[]);
+    let ostdout = stream.push(&[INST_OPEN_FILE, 1, stdout], &[]);
+    stream.push(&[INST_SET, 3, fds, c1, ostdout], &[]);
+    let ostderr = stream.push(&[INST_OPEN_FILE, 1, stderr], &[]);
+    stream.push(&[INST_SET, 3, fds, c2, ostderr], &[]);
+
     let c3 = stream.mk_const(3);
     stream.push(&[INST_SET, 3, fds, c3, dir_preopen], &[]);
+}
+
+fn mk_boot(stream: &mut StreamState, stage3: u32) -> u32 {
+    const STR_INIT: &str = "init";
+
+    let txt_init = stream.mk_utf8(STR_INIT);
+    let dir = stream.push(&[INST_NOOP, 0], &[]);
+    stream.push(&[INST_SET, 3, dir, txt_init, stage3], &[]);
+    stream.push(&[INST_DIRECTORY, 1, dir], &[])
 }
 
 fn mk_sbin(stream: &mut StreamState, exe_file: u32) -> u32 {
@@ -100,7 +143,7 @@ fn mk_sbin(stream: &mut StreamState, exe_file: u32) -> u32 {
     stream.push(&[INST_DIRECTORY, 1, dir], &[])
 }
 
-fn mk_proc(stream: &mut StreamState, fds: u32, exe_file: u32) -> u32 {
+fn mk_proc(stream: &mut StreamState, exe_file: u32) -> u32 {
     const STR_0: &str = "0";
     const STR_1: &str = "1";
     const STR_2: &str = "2";
@@ -125,19 +168,9 @@ fn mk_proc(stream: &mut StreamState, fds: u32, exe_file: u32) -> u32 {
     let stderr = stream.push(&[INST_ARRAY, 2, 0, 0], &[]);
     let stderr = stream.push(&[INST_FILE, 1, stderr], &[]);
 
-    let c0 = stream.mk_const(0);
-    let c1 = stream.mk_const(1);
-    let c2 = stream.mk_const(2);
-
     stream.push(&[INST_SET, 3, dir_fd, txt_0, stdin], &[]);
-    let ostdin = stream.push(&[INST_OPEN_FILE, 1, stdin], &[]);
-    stream.push(&[INST_SET, 3, fds, c0, ostdin], &[]);
     stream.push(&[INST_SET, 3, dir_fd, txt_1, stdout], &[]);
-    let ostdout = stream.push(&[INST_OPEN_FILE, 1, stdout], &[]);
-    stream.push(&[INST_SET, 3, fds, c1, ostdout], &[]);
     stream.push(&[INST_SET, 3, dir_fd, txt_2, stderr], &[]);
-    let ostderr = stream.push(&[INST_OPEN_FILE, 1, stderr], &[]);
-    stream.push(&[INST_SET, 3, fds, c2, ostderr], &[]);
 
     let dir_fd = stream.push(&[INST_DIRECTORY, 1, dir_fd], &[]);
     stream.push(&[INST_SET, 3, r_dir, txt_exe, exe_file], &[]);
