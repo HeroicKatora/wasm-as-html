@@ -52,6 +52,9 @@ export default async function(configuration) {
   configuration.fds[0] = rootdir.path_open(0, "proc/0/fd/0", 0).fd_obj;
   configuration.fds[1] = rootdir.path_open(0, "proc/0/fd/1", 0).fd_obj;
   configuration.fds[2] = rootdir.path_open(0, "proc/0/fd/2", 0).fd_obj;
+  configuration.args.length = 0;
+  configuration.args.push("scene-viewer");
+  configuration.args.push("default-scene/scene.gltf");
 
   try {
     console.log('start', configuration);
