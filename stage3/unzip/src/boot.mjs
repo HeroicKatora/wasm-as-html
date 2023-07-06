@@ -55,6 +55,7 @@ export default async function(configuration) {
   configuration.args.length = 0;
   configuration.args.push("scene-viewer");
   configuration.args.push("default-scene/scene.gltf");
+  configuration.env.push("RUST_BACKTRACE=full");
 
   try {
     console.log('start', configuration);
@@ -65,13 +66,12 @@ export default async function(configuration) {
       'headers': source_headers,
     })));
 
-    newWasi.start({ 'exports': ret });
+    await newWasi.start({ 'exports': ret });
     console.log('done');
   } catch (e) {
     console.log(e);
     console.log('at ', e.fileName, e.lineNumber, e.columnNumber);
     console.log(e.stack);
-    throw e;
   } finally {
     const [stdin, stdout, stderr] = configuration.fds;
     console.log('Result(stdin )', new TextDecoder().decode(stdin.file.data));
