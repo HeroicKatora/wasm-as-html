@@ -837,6 +837,8 @@ function getImports() {
         return addHeapObject(ret);
     };
     imports.wbg.__wbg_createQuerySet_9af179dcd7eb51f9 = function(arg0, arg1) {
+	    console.log('Query set', getObject(arg0));
+	    console.log('Query set', getObject(arg1));
         const ret = getObject(arg0).createQuerySet(getObject(arg1));
         return addHeapObject(ret);
     };
