@@ -1,0 +1,26 @@
+<html><head><link rel="stylesheet" type="text/css" href="data:text/css,body{visibility:hidden}" /></head><body>
+<div id="mainpage" style="visibility:initial">
+	<div id="stage0_error">You need Javascript to load this page</div>
+<script>
+  /* Async prepare handoff */
+  (async function() {
+    /* Error handling, in case we need it */
+    let error = document.getElementById('stage0_error');
+    try {
+      let URI_SRC = __REPLACE_THIS_WITH_WASM_AS_A_DATA_URI__;
+      let doc = await fetch(URI_SRC);
+      let bytes = await doc.arrayBuffer();
+      let wasm = await WebAssembly.compileStreaming(new Response(bytes, { headers: { 'content-type': 'application/wasm' }}));
+
+      let stage1 = WebAssembly.Module.customSections(wasm, 'wah_polyglot_stage1')[0];
+      let blob = new Blob([stage1], { type: 'application/javascript' });
+      let blobURL = URL.createObjectURL(blob);
+      let module = (await import(blobURL));
+      await module.default(bytes, wasm);
+    } catch (e) {
+      console.log(e);
+      error.innerText = 'Failed to load, check console if you are the developer';
+    }
+  })();
+</script>
+</html>

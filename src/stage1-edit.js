@@ -1,4 +1,4 @@
-async function init(bytes, wasm) {
+async function init(bytes, wasm, initial) {
   let index_html = WebAssembly.Module.customSections(wasm, 'wah_polyglot_stage1_html');
 
   if (index_html.length) {

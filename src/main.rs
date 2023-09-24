@@ -23,7 +23,7 @@ fn main() -> Result<(), std::io::Error> {
         // Html designed to terminate processing into further WASM sections. This is the only
         // section that needs to be placed specifically at the start. All other sections are then
         // parsed from the module.
-        data: include_bytes!("stage0.html"),
+        data: include_bytes!("stage0-wasm.html"),
     });
 
     // The actual (document) loader that prepares inputs and control for stage 2.
@@ -80,7 +80,32 @@ fn main() -> Result<(), std::io::Error> {
         });
     }
 
-    let wasm = encoder.finish();
+    let wasm = match args.target {
+        Target::WasmPlusHtml => encoder.finish(),
+        Target::Html => {
+            use base64::{display::Base64Display, engine::general_purpose};
+            let wasm = encoder.finish();
+            let template = include_str!("stage0-html.html");
+
+            // To include our WebAssembly module as data, we need to massage the data into an HTML
+            // compatible form. In the end, access to it as an ArrayBuffer is required. The pure
+            // `fetch` is sometimes limited by the browser so maybe that's a problem? But it is the
+            // most efficient base64 decoder we have. And it is **correct**.
+            //
+            // <https://stackoverflow.com/questions/21797299/convert-base64-string-to-arraybuffer>
+            // There answers are mostly bad, and confidently incorrect.
+            // I've tried the script <https://github.com/danguer/blog-examples/blob/master/js/base64-binary.js> and it
+            // failed to produce the roundtrip result. Maybe i've used it wrong? Some rather weird
+            // duplication code smells and dubious non-integer arithmetic so I can't motivate
+            // myself to a deeper dive.
+            let wasm = Base64Display::new(&wasm, &general_purpose::STANDARD);
+            let data_uri = format!("data:application/octet-stream;base64,{wasm}");
+
+            let data_uri_constructor = format!("'{data_uri}'");
+            let loaded = template.replace("__REPLACE_THIS_WITH_WASM_AS_A_DATA_URI__", &data_uri_constructor);
+            loaded.into()
+        }
+    };
 
     match &args.out {
         None => {
@@ -147,6 +172,20 @@ struct Args {
     #[arg(long = "trailing-zip-section")]
     zip_section_name: Option<String>,
 
+    /// How to wrap the output Web Assembly module.
+    ///
+    /// This determines the 'stage 0' entry point into setting up the web assembly. There are two
+    /// options:
+    ///
+    /// * `wasm`, which enters execution from an initial section that looks like valid HTML. This
+    ///   target is NOT compatible with serving from a file in Chromium, as it requires access to
+    ///   the file's own file-URI via `fetch`.
+    /// * `html`, which encodes the resulting module as a blob and loads it. This target is
+    ///   generally compatible with web browsers but obviously the output file is no longer a
+    ///   WebAssembly module itself.
+    #[arg(long, short = 't', alias = "target", default_value = "wasm")]
+    target: Target,
+
     // Experimental section.
     /// Experimental. Hot-reload when the WASM file changes.
     ///
@@ -157,6 +196,25 @@ struct Args {
     /// Must set the environment variable `WAH_POLYGLOT_EXPERIMENTAL` to use.
     #[arg(long, alias = "dev")]
     edit: bool,
+}
+
+#[derive(Clone)]
+enum Target {
+    WasmPlusHtml,
+    Html,
+}
+
+impl core::str::FromStr for Target {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "wasm" => Ok(Self::WasmPlusHtml),
+            "wasm+html" => Ok(Self::WasmPlusHtml),
+            "html" => Ok(Self::Html),
+            _ => Err(format!("Unknown target selection {s}")),
+        }
+    }
 }
 
 impl core::str::FromStr for ExtraSection {
