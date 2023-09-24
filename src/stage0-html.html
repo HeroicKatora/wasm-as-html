@@ -1,6 +1,6 @@
 <html><head><link rel="stylesheet" type="text/css" href="data:text/css,body{visibility:hidden}" /></head><body>
-<div id="mainpage" style="visibility:initial">
-	<div id="stage0_error">You need Javascript to load this page</div>
+  <div id="mainpage" style="visibility:initial">
+  <div id="stage0_error">You need Javascript to load this page</div>
 <script>
   /* Async prepare handoff */
   (async function() {
@@ -8,8 +8,7 @@
     let error = document.getElementById('stage0_error');
     try {
       let URI_SRC = __REPLACE_THIS_WITH_WASM_AS_A_DATA_URI__;
-      let doc = await fetch(URI_SRC);
-      let bytes = await doc.arrayBuffer();
+      let bytes = __REPLACE_THIS_WITH_URI_LOADER__;
       let wasm = await WebAssembly.compileStreaming(new Response(bytes, { headers: { 'content-type': 'application/wasm' }}));
 
       let stage1 = WebAssembly.Module.customSections(wasm, 'wah_polyglot_stage1')[0];

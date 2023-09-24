@@ -94,15 +94,51 @@ fn main() -> Result<(), std::io::Error> {
             //
             // <https://stackoverflow.com/questions/21797299/convert-base64-string-to-arraybuffer>
             // There answers are mostly bad, and confidently incorrect.
-            // I've tried the script <https://github.com/danguer/blog-examples/blob/master/js/base64-binary.js> and it
-            // failed to produce the roundtrip result. Maybe i've used it wrong? Some rather weird
-            // duplication code smells and dubious non-integer arithmetic so I can't motivate
-            // myself to a deeper dive.
             let wasm = Base64Display::new(&wasm, &general_purpose::STANDARD);
             let data_uri = format!("data:application/octet-stream;base64,{wasm}");
-
             let data_uri_constructor = format!("'{data_uri}'");
-            let loaded = template.replace("__REPLACE_THIS_WITH_WASM_AS_A_DATA_URI__", &data_uri_constructor);
+            let with_data = template.replace("__REPLACE_THIS_WITH_WASM_AS_A_DATA_URI__", &data_uri_constructor);
+
+            // 16 MB is generally okay..
+            let loaded = if data_uri.len().ilog2() < 24 {
+                // Nothing to do..
+                with_data.replace("__REPLACE_THIS_WITH_URI_LOADER__", "await (async function() {
+                    let doc = await fetch(URI_SRC);
+                    return await doc.arrayBuffer();
+                })()")
+            } else if data_uri.len().ilog2() < 31 {
+                // For larger module (scarily large) we need a different strategy that is not yet
+                // implemented here. In particular, Firefox makes a 32MB restriction on the size of
+                // a DataUrl which seems to be enforced when `fetch` is called (which converts it
+                // into an URL object? Not quite sure where the actual restriction is placed).
+                // We do
+                with_data.replace("__REPLACE_THIS_WITH_URI_LOADER__", r#"await (async function() {
+                    const b64 = URI_SRC.slice(URI_SRC.indexOf(",")+1);
+                    const buffer = new ArrayBuffer((b64.length / 4) * 3 - b64.match(/=*$/)[0].length);
+                    const IDX_STR = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
+                    const view = new Uint8Array(buffer);
+                    console.log(`Loading ${view.length} bytes of Base64 module data`);
+
+                    let i = 0;
+                    let j = 0;
+                    for (; j < b64.length;) {
+                        let a = IDX_STR.indexOf(b64.charAt(j++));
+                        let b = IDX_STR.indexOf(b64.charAt(j++));
+                        let c = IDX_STR.indexOf(b64.charAt(j++));
+                        let d = IDX_STR.indexOf(b64.charAt(j++));
+
+                        view[i++] = (a << 2) | (b >> 4);
+                        if (c < 64) view[i++] = ((b & 0xf) << 4) | (c >> 2);
+                        if (d < 64) view[i++] = ((c & 0x3) << 6) | (d >> 0);
+                    }
+
+                    return view;
+                })()"#)
+            } else {
+                // This is too large for most String implementations..
+                panic!("The `html` target does not support modules larger than 2GB.");
+            };
+
             loaded.into()
         }
     };
