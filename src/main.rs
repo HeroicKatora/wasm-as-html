@@ -96,7 +96,7 @@ fn main() -> Result<(), std::io::Error> {
             // There answers are mostly bad, and confidently incorrect.
             let wasm = Base64Display::new(&wasm, &general_purpose::STANDARD);
             let data_uri = format!("data:application/octet-stream;base64,{wasm}");
-            let data_uri_constructor = format!("'{data_uri}'");
+            let data_uri_constructor = format!("{data_uri}");
             let with_data = template.replace("__REPLACE_THIS_WITH_WASM_AS_A_DATA_URI__", &data_uri_constructor);
 
             // 16 MB is generally okay..
@@ -112,6 +112,9 @@ fn main() -> Result<(), std::io::Error> {
                 // a DataUrl which seems to be enforced when `fetch` is called (which converts it
                 // into an URL object? Not quite sure where the actual restriction is placed).
                 // We do
+                //
+                // FIXME: Evaluate ReadableByteStream for chunk-based yields <https://developer.mozilla.org/en-US/docs/Web/API/ReadableByteStreamController>
+                //
                 with_data.replace("__REPLACE_THIS_WITH_URI_LOADER__", r#"await (async function() {
                     const b64 = URI_SRC.slice(URI_SRC.indexOf(",")+1);
                     const buffer = new ArrayBuffer((b64.length / 4) * 3 - b64.match(/=*$/)[0].length);

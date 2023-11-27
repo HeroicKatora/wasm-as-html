@@ -1,4 +1,6 @@
-<html><head><link rel="stylesheet" type="text/css" href="data:text/css,body{visibility:hidden}" /></head><body>
+<html><head><link rel="stylesheet" type="text/css" href="data:text/css,body{visibility:hidden}" />
+    <template id="wah_datauri">__REPLACE_THIS_WITH_WASM_AS_A_DATA_URI__</template>
+</head><body>
   <div id="mainpage" style="visibility:initial">
   <div id="stage0_error">You need Javascript to load this page</div>
 <script>
@@ -7,7 +9,7 @@
     /* Error handling, in case we need it */
     let error = document.getElementById('stage0_error');
     try {
-      let URI_SRC = __REPLACE_THIS_WITH_WASM_AS_A_DATA_URI__;
+      let URI_SRC = document.getElementById('wah_datauri').content.firstChild.wholeText;
       let bytes = __REPLACE_THIS_WITH_URI_LOADER__;
       let wasm = await WebAssembly.compileStreaming(new Response(bytes, { headers: { 'content-type': 'application/wasm' }}));
 
