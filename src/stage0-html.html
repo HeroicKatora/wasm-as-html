@@ -1,16 +1,20 @@
 <html><head><link rel="stylesheet" type="text/css" href="data:text/css,body{visibility:hidden}" />
-    <template id="wah_datauri">__REPLACE_THIS_WITH_WASM_AS_A_DATA_URI__</template>
+    <template id="wah_data_uri">__REPLACE_THIS_WITH_WASM_AS_A_DATA_URI__</template>
+    <template id="wah_data_loader">__REPLACE_THIS_WITH_URI_LOADER__</template>
 </head><body>
   <div id="mainpage" style="visibility:initial">
   <div id="stage0_error">You need Javascript to load this page</div>
 <script>
   /* Async prepare handoff */
-  (async function() {
+  (async function(template_id = 'wah_data_uri', loader_id = 'wah_data_loader') {
     /* Error handling, in case we need it */
     let error = document.getElementById('stage0_error');
     try {
-      let URI_SRC = document.getElementById('wah_datauri').content.firstChild.wholeText;
-      let bytes = __REPLACE_THIS_WITH_URI_LOADER__;
+      let URI_SRC = document.getElementById(template_id).content.firstChild.wholeText;
+      let LOADER_SRC = document.getElementById(loader_id).content.firstChild.wholeText;
+
+      let bytes = await (function.__proto__.constructor(LOADER_SRC))(URI_SRC);
+
       let wasm = await WebAssembly.compileStreaming(new Response(bytes, { headers: { 'content-type': 'application/wasm' }}));
 
       let stage1 = WebAssembly.Module.customSections(wasm, 'wah_polyglot_stage1')[0];
