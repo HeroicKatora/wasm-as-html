@@ -17,6 +17,7 @@ features = ["alloc"]
 [workspace]
 members = [
   ".",
+  "lib/html_and_tar",
   "wasi-loader/interpret",
   "stage3/unzip",
 

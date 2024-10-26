@@ -184,6 +184,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "html_and_tar"
+version = "0.1.0"
+dependencies = [
+ "base64",
+]
+
+[[package]]
 name = "idna"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
