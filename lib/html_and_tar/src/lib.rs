@@ -34,6 +34,13 @@ pub struct TarHeader {
     __padding: [u8; 12],
 }
 
+pub struct Entry<'la> {
+    /// An ascii name for this file.
+    pub name: &'la str,
+    /// The data in its raw form. It will be re-encoded to be HTML safe.
+    pub data: &'la [u8],
+}
+
 pub struct InitialEscape {
     /// What Tar header describes the start of the HTML?
     pub header: TarHeader,
@@ -44,8 +51,18 @@ pub struct InitialEscape {
 
 pub struct EscapedData {
     pub padding: &'static [u8],
+    /// The header entry, which transitions us into TAR semantics.
     pub header: TarHeader,
+    /// The file entry which closes the HTML tag with the file name visible to both tar as well as
+    /// HTML under appropriate attributes.
+    pub file: TarHeader,
     pub data: Vec<u8>,
+}
+
+pub struct EscapedSentinel {
+    pub padding: &'static [u8],
+    /// The header entry, which transitions us into TAR semantics.
+    pub header: TarHeader,
 }
 
 impl TarEngine {
@@ -53,78 +70,129 @@ impl TarEngine {
     ///
     /// Must not modify HTML semantics.
     pub fn start_of_file(&mut self, html_head: &[u8], entry_offset: usize) -> InitialEscape {
-        assert!(html_head.len() < 95);
+        assert!(html_head.len() < 94);
         assert_eq!(html_head.last().copied(), Some(b'>'));
 
         let consumed = html_head.len();
         let all_except_close = html_head.len() - 1;
 
         let mut this = TarHeader::EMPTY;
-        this.name[..all_except_close].copy_from_slice(&html_head[..all_except_close]);
-        this.name[all_except_close..][..5].copy_from_slice(b"__A=\"");
+        this.name[1..][..all_except_close].copy_from_slice(&html_head[..all_except_close]);
+        this.name[1..][all_except_close..][..5].copy_from_slice(b"__A=\"");
         this.prefix[153..].copy_from_slice(b"\">");
         this.typeflag = b'0';
 
-        let extra_len = entry_offset.checked_sub(consumed).unwrap();
-        this.assign_size(extra_len);
+        let tail_len = entry_offset.checked_sub(consumed).unwrap();
+        this.assign_size(tail_len);
         this.assign_standards();
         this.assign_checksum();
 
         self.len += core::mem::size_of::<TarHeader>() as u64;
-        self.len += extra_len as u64;
+        self.len += tail_len as u64;
 
         InitialEscape {
             header: this,
+            // extra refers to all the data we are adding. Which isn't anything yet.
             extra: vec![],
             consumed,
         }
     }
 
-    pub fn escaped_insert_base64(&mut self, data: &[u8]) -> EscapedData {
-        let padding = self.pad_to_fit();
+    pub fn escaped_insert_base64(&mut self, Entry { name, data }: Entry) -> EscapedData {
+        assert!(name.is_ascii(), "Name must be ascii");
 
-        const START: &[u8] = b"<template>";
+        assert!(
+            name.chars().all(|c| c.is_ascii_alphanumeric()),
+            "Name {name} must be HTML compatible without escapes"
+        );
+
+        let padding = self.pad_to_fit();
+        let data = STANDARD.encode(data).into_bytes();
+
+        const START: &[u8] = b"\0<template __A=\"";
+        const DATA_START: &[u8] = b"\">";
+        const ID: &[u8] = b"\" id=\"";
+        const CONT: &[u8] = b"\" __B=\"";
+
         let mut this = TarHeader::EMPTY;
         this.name[..START.len()].copy_from_slice(START);
-        this.assign_size(data.len());
+        this.assign_size(0);
         this.assign_standards();
+        let end_start = this.prefix.len() - ID.len();
+        this.prefix[end_start..].copy_from_slice(ID);
         this.assign_checksum();
-
-        let data = STANDARD.encode(data).into_bytes();
         self.len += core::mem::size_of::<TarHeader>() as u64;
+
+        let mut file = TarHeader::EMPTY;
+        let end_start = this.prefix.len() - DATA_START.len();
+        file.name[..name.len()].copy_from_slice(name.as_bytes());
+        file.name[name.len()..][1..][..CONT.len()].copy_from_slice(CONT);
+        file.assign_size(data.len());
+        file.prefix[end_start..].copy_from_slice(DATA_START);
+        file.assign_checksum();
+        self.len += core::mem::size_of::<TarHeader>() as u64;
+
+        // Followed by the data.
         self.len += data.len() as u64;
 
         EscapedData {
             padding,
             header: this,
+            file,
             data,
         }
     }
 
-    pub fn escaped_continue_base64(&mut self, data: &[u8]) -> EscapedData {
-        let padding = self.pad_to_fit();
+    pub fn escaped_continue_base64(&mut self, Entry { name, data }: Entry) -> EscapedData {
+        assert!(name.is_ascii(), "Name must be ascii");
 
-        const START: &[u8] = b"</template><template>";
+        assert!(
+            name.chars().all(|c| c.is_ascii_alphanumeric()),
+            "Name {name} must be HTML compatible without escapes"
+        );
+
+        let padding = self.pad_to_fit();
+        let data = STANDARD.encode(data).into_bytes();
+
+        const START: &[u8] = b"\0</template><template __A=\"";
+        const DATA_START: &[u8] = b"\">";
+        const ID: &[u8] = b"\" id=\"";
+        const CONT: &[u8] = b"\" __B=\"";
+
         let mut this = TarHeader::EMPTY;
         this.name[..START.len()].copy_from_slice(START);
-        this.assign_size(data.len());
+        this.assign_size(0);
         this.assign_standards();
+        let end_start = this.prefix.len() - ID.len();
+        this.prefix[end_start..].copy_from_slice(ID);
         this.assign_checksum();
+        self.len += core::mem::size_of::<TarHeader>() as u64;
 
-        let data = STANDARD.encode(data).into_bytes();
+        let mut file = TarHeader::EMPTY;
+        let end_start = file.prefix.len() - DATA_START.len();
+        file.name[..name.len()].copy_from_slice(name.as_bytes());
+        file.name[name.len()..][1..][..CONT.len()].copy_from_slice(CONT);
+        file.assign_size(data.len());
+        file.prefix[end_start..].copy_from_slice(DATA_START);
+        file.assign_checksum();
+        self.len += core::mem::size_of::<TarHeader>() as u64;
+
+        // Followed by the data.
+        self.len += data.len() as u64;
 
         EscapedData {
             padding,
             header: this,
+            file,
             data,
         }
     }
 
     /// End a sequence of escaped data, with a particular skip of raw HTML bytes to follow until
     /// the next blocks of such data (again starting as `escaped_insert_base64`).
-    pub fn escaped_end(&mut self, skip: usize) -> EscapedData {
+    pub fn escaped_end(&mut self, skip: usize) -> EscapedSentinel {
         let padding = self.pad_to_fit();
-        const END: &[u8] = b"</template>";
+        const END: &[u8] = b"\0</template>";
 
         let mut this = TarHeader::EMPTY;
         this.assign_size(skip);
@@ -132,10 +200,9 @@ impl TarEngine {
         this.assign_standards();
         this.assign_checksum();
 
-        EscapedData {
+        EscapedSentinel {
             padding,
             header: this,
-            data: vec![],
         }
     }
 
